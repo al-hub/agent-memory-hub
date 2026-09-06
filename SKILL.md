@@ -1,219 +1,176 @@
 ---
 name: agent-memory-hub
-description: Shared L2 memory and continuity layer for AI coding agents. Use proactively when a task may depend on prior decisions, project/repository/worktree state, lessons, earlier sessions, or another agent's work. The user should not need to ask for memory explicitly. Prefer fast local recall, preserve provenance, and surface conflicts or uncertain context instead of guessing.
+description: Shared L2 memory and continuity layer for AI coding agents. Use proactively when a task may depend on prior decisions, project/repository/worktree state, lessons, earlier sessions, or another agent's work. Prefer fast local recall, preserve provenance, surface conflicts/stale context, and keep normal use nearly invisible.
 ---
 
 # Agent Memory Hub
 
 Use `agent-memory-hub` as a shared, agent-independent L2 memory and continuity layer.
 
+## Installation
+
+Preferred setup is the one-command npx installer:
+
+```bash
+npx -y github:al-hub/agent-memory-hub install
+```
+
+It installs this Agent Skill globally, copies a persistent runtime to `~/.agent-memory-hub/runtime`, initializes the local store, and non-destructively merges SessionStart hooks for Codex, Claude Code, and Gemini CLI.
+
+After the scoped npm package is published, the same contract is:
+
+```bash
+npx -y @al-hub/agent-memory-hub@latest install
+```
+
+Remove managed hooks/runtime/skill while preserving memory data with:
+
+```bash
+npx -y github:al-hub/agent-memory-hub uninstall
+```
+
 ## Core model
 
-- L1: the current agent's session context, local memory files, rules, and accessible history.
-- L2: `agent-memory-hub`, a persistent local store shared across agents.
-- Raw evidence is canonical. Summaries/memories are indexes and interpretations, not unquestionable truth.
-- Continuity should feel seamless: recall useful prior context when needed without requiring the user to say "use memory" or name this skill.
+- L1: current agent session context, local rules, accessible history.
+- L2: persistent `agent-memory-hub` memory shared across agents.
+- Raw evidence is canonical. Memory claims and summaries are governed interpretations/indexes.
+- Continuity should be automatic when relevant and effectively invisible when irrelevant.
 
-## Hook-native path
+## Hook-native continuity
 
-When the host agent supports `SessionStart` hooks, prefer the shared hook entry point so session identity and reset/resume state come directly from the agent instead of being guessed:
+When SessionStart hooks are available, prefer them over manual recall. The installed hook runs the persistent runtime, not the temporary npx cache:
 
-```bash
-python3 scripts/session_start_hook.py --agent codex
-python3 scripts/session_start_hook.py --agent claude
-python3 scripts/session_start_hook.py --agent gemini
+```text
+python3 ~/.agent-memory-hub/runtime/scripts/session_start_hook.py --agent <agent>
 ```
 
-The hook reads JSON from stdin and returns hook-compatible JSON on stdout. It normalizes `session_id`, `cwd`, and `source`, then runs repository/worktree/HEAD detection, continuity gating, scoped retrieval, governance, stale-HEAD handling, and bounded projection.
+Typical mapping:
 
-Source semantics:
-
-- `startup`: new/empty L1; if the repository is known, project an onboarding pack.
-- `resume`: refresh a resume pack.
-- `clear`: refresh a resume pack even if the agent keeps the same session id.
-- `compact`: refresh a resume pack when supported.
-- `fork`: refresh a resume pack when supported.
-
-Hook failures are fail-open and must never prevent the coding agent from starting. If hook input is invalid or L2 is unavailable, return an empty valid SessionStart response and continue.
-
-A SessionStart hook has no user prompt yet. In that case the memory reader performs a bounded browse of currently visible scopes rather than a lexical search, and the projector selects only the mode-relevant memories within the token budget.
-
-## Default seamless path
-
-When hook-native invocation is not installed or when continuity must be evaluated for the current user prompt, prefer the seamless continuity entry point over manual broad recall:
-
-```bash
-python3 scripts/continuity_context.py "<current user/task message>" --cwd "$PWD" --json
+```text
+startup → ONBOARDING when the repository already has L2 memory
+resume  → RESUME
+clear   → RESUME
+compact → RESUME where supported
+fork    → RESUME where supported
 ```
 
-When a stable agent session id is available, pass it:
+Hook errors are fail-open. Never prevent the coding agent from starting because memory lookup failed.
+
+## Prompt-facing seamless path
+
+When the hook did not already provide continuity context and the current user request plausibly depends on prior work, use:
 
 ```bash
-python3 scripts/continuity_context.py "<current user/task message>" \
+python3 ~/.agent-memory-hub/runtime/scripts/continuity_context.py \
+  "<current user/task message>" \
   --cwd "$PWD" \
-  --session-id "<session-id>" \
   --json
 ```
 
-If the current agent session has little or no useful L1 context, such as immediately after a clear/reset or first entry into an existing project, add `--empty-session`.
+Treat `mode: no_recall` as success. Do not fall back to broad history search simply because no memory was returned.
 
-The command automatically performs local repository/worktree/branch/HEAD inspection, continuity-state detection, the cheap Continuity Gate, scoped SQLite/FTS retrieval when needed, governance filtering, stale-HEAD handling, deduplication, and bounded context projection.
+Manual direct recall is for explicit historical lookup or deliberately narrow queries:
 
-Treat `mode: no_recall` as a successful fast-path result: do not fall back to broad memory search unless the task itself explicitly requires historical lookup.
+```bash
+python3 ~/.agent-memory-hub/runtime/scripts/memory_hub.py recall "<query>" --limit 8
+```
 
 ## Continuity gate
 
-Before recalling, cheaply decide whether prior context can materially change the action or answer.
+Recall when prior context can materially change the answer/action, especially:
 
-Recall proactively for continuity-sensitive situations such as:
+- continue/resume/as-before wording;
+- first entry or return to a repository/worktree with existing L2 memory;
+- session clear/reset/compaction;
+- cross-agent continuation;
+- architecture, migration, implementation, performance, test, or tooling work that depends on prior decisions;
+- repeated failures where a previous lesson/workaround may exist.
 
-- "continue", "resume", "as before", "the earlier approach", or equivalent wording;
-- entering or returning to a repository/worktree where prior agent work may exist;
-- switching from one AI agent to another on the same project;
-- session reset/clear where the current task obviously continues earlier work;
-- architecture, implementation, performance, test, migration, or tooling work that may depend on established project decisions;
-- a repeated failure where an earlier lesson or workaround may exist.
+Do not recall for ordinary stateless questions or fully specified trivial edits.
 
-Do **not** recall for ordinary stateless questions where past user/project context cannot materially affect the answer. The memory layer should be almost invisible when irrelevant.
+## Scope discipline
 
-## Manual recall fallback
+Prefer the most specific visible scope:
 
-Use direct recall when the user explicitly asks about historical memory, when you need a deliberately narrow historical query, or when the seamless command cannot represent the required lookup:
-
-```bash
-python3 scripts/memory_hub.py recall "<concise query>" --limit 8
+```text
+task > worktree > branch > repository > global
 ```
 
-When the relevant project/repository scope is known, prefer a scoped recall rather than broad global retrieval.
+Never inject a branch/worktree/task memory from another repository merely because the local names match.
 
-Use returned memories as evidence. Prefer active/verified (legacy `confirmed`) memories. Treat `candidate`, `needs_review`, `conflict`, and stale/archived states as warnings, not facts. Ignore quarantined/rejected records by default. A superseded memory is historical context unless the user asks about the past.
+At SessionStart there may be no user prompt. In that case bounded visible-scope browse is valid; the projector should choose the smallest useful onboarding/resume pack.
 
-If a source pointer is important to the answer or action, inspect the memory:
+## Projection discipline
 
-```bash
-python3 scripts/memory_hub.py inspect <memory-id>
+Use the bounded projected context, not a raw memory dump.
+
+Typical modes:
+
+- **onboarding**: decisions, constraints, architecture/procedures, pitfalls, relevant project state;
+- **resume**: current objective/state, decisions, lessons, next useful action;
+- **handoff**: objective, changed/verified/failed, decisions, risks, next action;
+- **recall**: memories directly relevant to the current question.
+
+If `STALE_HEAD` is present, stable decisions/constraints may remain useful, but volatile `project_state` must be revalidated against current code before acting.
+
+## Governance
+
+Prefer active/verified evidence-backed memories. Preserve uncertainty explicitly:
+
+```text
+lifecycle:
+  candidate | active | superseded | archived | quarantined
+
+review_state:
+  verified | unverified | needs_review | conflict
 ```
 
-## Continuity projection
+Never silently choose a winner between conflicting memories. A newer intentional decision can supersede an older one, but different scopes should not be turned into false conflicts.
 
-Do not dump recall output verbatim into context. Use the bounded projected context returned by the seamless path when available.
+## Writing durable memory
 
-Typical projections:
+Capture only information likely to matter later:
 
-- **onboarding**: repository purpose, architecture, important decisions, constraints, known pitfalls, build/test conventions;
-- **resume**: current objective, completed work, verified current state, recent failures, next action;
-- **handoff**: objective, what changed, what was verified, failures/risks, important decisions, next recommended action;
-- **recall**: only memories directly relevant to the user's current question or action.
+- explicit decisions;
+- verified tests/benchmarks;
+- meaningful failures/lessons;
+- discovered constraints;
+- architecture changes;
+- material task/project/worktree state;
+- explicit user corrections.
 
-These are projections over L2, not independent sources of truth. Prefer evidence-backed current state over stale summaries.
+Do not store transient chatter as durable fact. Use candidate/needs-review states when intent or context is ambiguous.
 
-When `STALE_HEAD` appears, keep stable decisions/constraints available but revalidate volatile `project_state` against the current repository before acting.
-
-## First use / bootstrap
-
-The seamless continuity command is safe before L2 initialization and should degrade to an empty context instead of failing. For durable storage and L1 import, initialize explicitly:
-
-```bash
-python3 scripts/memory_hub.py init
-python3 scripts/memory_hub.py import-l1 --dry-run
-```
-
-If the task explicitly authorizes setup/import, run the real import:
+Compatibility write example:
 
 ```bash
-python3 scripts/memory_hub.py import-l1
-```
-
-The importer may only use L1 sources that are actually accessible on disk. Never claim access to a product's private/internal memory unless an accessible source exists.
-
-## Writing memories
-
-Add or propose durable information when it will plausibly matter in future sessions. Avoid transient chatter.
-
-Strong capture candidates include:
-
-- an explicit decision;
-- a verified test or benchmark result;
-- a failed approach worth avoiding;
-- a discovered constraint;
-- a meaningful architecture change;
-- a material project/worktree/task state change;
-- an explicit user correction that changes prior understanding.
-
-Good memory types include:
-
-- `identity`
-- `preference`
-- `decision`
-- `constraint`
-- `project_state`
-- `episode`
-- `lesson`
-- `fact`
-- `procedure`
-
-Example using the compatibility CLI:
-
-```bash
-python3 scripts/memory_hub.py add \
-  "Rust implementation uses a separate repository." \
+python3 ~/.agent-memory-hub/runtime/scripts/memory_hub.py add \
+  "FTS5 is the primary recall path." \
   --type decision \
   --status confirmed \
-  --confidence 0.96 \
-  --context-quality clear \
-  --source-agent codex \
-  --source-pointer "conversation:2026-09-02"
+  --source-agent codex
 ```
 
-Use candidate/unverified/needs-review states when the user's intent was not explicit. Do not convert brainstorming language such as "A could work" into a verified decision.
+## Evidence and conflicts
 
-## Conflict handling
+If a source pointer matters, inspect the memory/evidence instead of trusting a summary blindly. Preserve repeated claims from the same underlying source as one evidence group rather than treating agent repetition as independent confirmation.
 
-Never silently overwrite contradictory memories.
+When conflicts are unresolved, surface them to the user/agent rather than inventing a resolution.
 
-When a known memory conflicts with another one, preserve both and link the conflict. Temporal change is not automatically a contradiction: prefer supersession when a newer preference or decision clearly replaces an older one. Apparently incompatible claims in different repository/worktree/task scopes should be treated as different context rather than a false conflict.
+## Health and bootstrap
 
-Compatibility CLI example:
+The npx installer initializes the store. Existing accessible L1 sources can be bootstrapped explicitly:
 
 ```bash
-python3 scripts/memory_hub.py add "<new statement>" \
-  --status conflict \
-  --conflicts-with <existing-id>
+python3 ~/.agent-memory-hub/runtime/scripts/memory_hub.py import-l1 --dry-run
+python3 ~/.agent-memory-hub/runtime/scripts/memory_hub.py import-l1
 ```
 
-When the user later resolves it:
+For diagnostics:
 
 ```bash
-python3 scripts/memory_hub.py resolve <memory-id> --status confirmed
-python3 scripts/memory_hub.py resolve <old-id> --status superseded --superseded-by <memory-id>
+python3 ~/.agent-memory-hub/runtime/scripts/memory_hub.py doctor
+python3 ~/.agent-memory-hub/runtime/scripts/memory_hub.py status
 ```
 
-## Cleaning rules
-
-Before promoting L1 observations into durable L2 memory:
-
-1. Deduplicate semantically equivalent statements when possible.
-2. Reject or quarantine trivial short-lived chatter.
-3. Preserve provenance and source pointers.
-4. Mark ambiguous context `needs_review`.
-5. Keep conflicting candidates instead of choosing one without evidence.
-6. Prefer a small number of durable memories over storing every sentence as a fact.
-7. Keep source raw material available when importing files.
-8. Do not increase confidence merely because several agents repeat the same underlying evidence.
-
-## Context pack discipline
-
-Return only the smallest relevant memory set. Do not dump the entire store into the model context. Prefer scope/type filtering and metadata/FTS retrieval first; use semantic retrieval only if a future implementation provides it and lexical recall is insufficient.
-
-Normal continuity should favor a few high-value memories over exhaustive history. Expand into evidence/raw history only when the task requires it.
-
-## Health checks
-
-For setup or suspected corruption:
-
-```bash
-python3 scripts/memory_hub.py doctor
-python3 scripts/memory_hub.py status
-```
-
-If the store reports conflicts or review-needed items relevant to the current task, surface that uncertainty to the user rather than guessing.
+Only import sources actually accessible/configured on disk. Never claim access to private product memory that is not available.
