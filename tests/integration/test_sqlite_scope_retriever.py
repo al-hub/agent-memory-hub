@@ -64,7 +64,7 @@ class SQLiteScopeRetrieverTest(unittest.TestCase):
 
     def test_more_specific_scope_ranks_before_repository_and_global(self):
         reader = SQLiteMemoryReader(self.db)
-        hits = reader.recall(RecallQuery("FTS5", self.context, limit=10))
+        hits = reader.recall(RecallQuery("FTS5 SQLite", self.context, limit=10))
         rank = {x.id: x.scope_rank for x in hits}
         self.assertLess(rank["w"], rank["r"])
         self.assertLess(rank["r"], rank["g"])
