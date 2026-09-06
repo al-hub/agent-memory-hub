@@ -145,7 +145,6 @@ def migrate_v2(con):
             (lifecycle, review, r["id"]),
         )
 
-    # Backfill legacy source fields into first-class evidence exactly once.
     rows = con.execute("""
         SELECT id,source_agent,source_type,source_pointer,source_hash,evidence_group,confidence
         FROM memories
@@ -476,7 +475,7 @@ def parser():
 def main():
     args = parser().parse_args()
     result = args.fn(args)
-    return 0 if result is None else result
+    return result if isinstance(result, int) and not isinstance(result, bool) else 0
 
 
 if __name__ == "__main__": raise SystemExit(main())
