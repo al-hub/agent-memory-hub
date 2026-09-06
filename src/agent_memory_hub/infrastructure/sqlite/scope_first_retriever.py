@@ -12,22 +12,48 @@ from agent_memory_hub.infrastructure.sqlite.scope_key import scope_fts_token
 
 
 class ScopeFirstSQLiteMemoryReader:
-    """Experimental FTS reader that intersects scope postings before statement postings.
+    """FTS reader that intersects scope postings before statement postings.
 
-    `memory_fts_scoped` indexes two searchable columns: statement and scope_key.
-    The scope key is a deterministic token derived from (scope, scope_ref), so the
-    FTS engine can intersect visible scopes with lexical terms before joining the
-    governed `memories` rows. Missing/unsupported scoped FTS falls back to the
-    existing broad reader so the experiment is safe to deploy alongside v0.2.
+    The default experimental layout uses `memory_fts_scoped`. A compatible
+    single-index layout can reuse this implementation by selecting `memory_fts`
+    when that table contains a searchable `scope_key` column.
+
+    If the requested scoped FTS layout is unavailable or incompatible, recall
+    falls back to the existing broad reader so migrations remain fail-safe.
     """
 
-    def __init__(self, db_path: str | Path, scope_resolver: ScopeResolver | None = None):
+    def __init__(
+        self,
+        db_path: str | Path,
+        scope_resolver: ScopeResolver | None = None,
+        *,
+        table_name: str = "memory_fts_scoped",
+    ):
+        if table_name not in {"memory_fts_scoped", "memory_fts"}:
+            raise ValueError("unsupported scoped FTS table")
         self._db_path = Path(db_path)
         self._scope_resolver = scope_resolver or ScopeResolver()
         self._fallback = SQLiteMemoryReader(self._db_path, self._scope_resolver)
+        self._table_name = table_name
 
     def _terms(self, text: str) -> list[str]:
         return [x for x in re.findall(r"[\w가-힣.-]+", text.lower()) if len(x) > 1]
+
+    def _supports_scope_key(self, con: sqlite3.Connection) -> bool:
+        try:
+            exists = con.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                (self._table_name,),
+            ).fetchone()
+            if not exists:
+                return False
+            columns = {
+                row[1]
+                for row in con.execute(f"PRAGMA table_info({self._table_name})").fetchall()
+            }
+            return {"id", "statement", "scope_key"}.issubset(columns)
+        except sqlite3.OperationalError:
+            return False
 
     def recall(self, query: RecallQuery) -> list[MemoryCandidate]:
         terms = self._terms(query.text)
@@ -76,23 +102,21 @@ class ScopeFirstSQLiteMemoryReader:
             params.append(query.memory_type)
         where = " AND ".join(clauses)
         scope_rank_expr = "CASE " + " ".join(rank_case) + " ELSE 999 END"
+        table = self._table_name
 
         con = sqlite3.connect(self._db_path)
         con.row_factory = sqlite3.Row
         try:
             try:
-                scoped_fts_exists = con.execute(
-                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='memory_fts_scoped'"
-                ).fetchone()
-                if not scoped_fts_exists:
+                if not self._supports_scope_key(con):
                     return self._fallback.recall(query)
 
                 sql = f"""
-                    SELECT m.*, bm25(memory_fts_scoped, 0.0, 1.0, 0.0) AS lexical_rank,
+                    SELECT m.*, bm25({table}, 0.0, 1.0, 0.0) AS lexical_rank,
                            {scope_rank_expr} AS scope_rank
-                    FROM memory_fts_scoped
-                    JOIN memories m ON m.id=memory_fts_scoped.id
-                    WHERE memory_fts_scoped MATCH ? AND {where}
+                    FROM {table}
+                    JOIN memories m ON m.id={table}.id
+                    WHERE {table} MATCH ? AND {where}
                     ORDER BY scope_rank ASC, lexical_rank ASC, m.confidence DESC
                     LIMIT ?
                 """
