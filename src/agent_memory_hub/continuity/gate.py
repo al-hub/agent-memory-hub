@@ -12,11 +12,8 @@ from agent_memory_hub.domain.continuity import (
 class ContinuityGate:
     """Cheap deterministic gate deciding whether shared memory should be recalled."""
 
-    _HANDOFF = re.compile(
-        r"\b(?:claude|codex|gemini|antigravity)\b.*(?:하던|작업|이어|handoff|continue)|"
-        r"(?:하던|작업|이어|handoff|continue).*(?:claude|codex|gemini|antigravity)",
-        re.IGNORECASE,
-    )
+    _AGENTS = ("claude", "codex", "gemini", "antigravity")
+    _HANDOFF_ACTION = re.compile(r"(?:하던|작업|이어|handoff|continue)", re.IGNORECASE)
     _RESUME = re.compile(
         r"(?:이어서|이어\s*서|계속\s*(?:진행|해|하자|해줘)?|하던\s*(?:것|거|작업)|resume|continue)",
         re.IGNORECASE,
@@ -26,13 +23,18 @@ class ContinuityGate:
         re.IGNORECASE,
     )
 
+    def _is_handoff(self, message: str) -> bool:
+        lowered = message.lower()
+        has_agent = any(agent in lowered for agent in self._AGENTS)
+        return has_agent and bool(self._HANDOFF_ACTION.search(message))
+
     def decide(self, request: ContinuityRequest) -> ContinuityDecision:
         message = request.message.strip()
 
         if request.context.repository is None:
             return ContinuityDecision(ContinuityMode.NO_RECALL, "no repository context")
 
-        if self._HANDOFF.search(message):
+        if self._is_handoff(message):
             return ContinuityDecision(ContinuityMode.HANDOFF, "cross-agent continuity wording")
 
         if request.session_reset and request.repository_known:
