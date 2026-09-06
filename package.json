@@ -1,6 +1,6 @@
 {
   "name": "@al-hub/agent-memory-hub",
-  "version": "0.2.0-alpha.14",
+  "version": "0.2.0-alpha.15",
   "description": "Local-first shared L2 memory and continuity layer for AI coding agents",
   "type": "module",
   "bin": {
