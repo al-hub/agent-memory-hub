@@ -2,7 +2,7 @@
 
 **One trusted memory for every AI agent.**
 
-Current development baseline: **v0.2.0-alpha.2**
+Current development baseline: **v0.2.0-alpha.4**
 
 `agent-memory-hub` is a local-first L2 memory and continuity layer for coding agents and LLM CLIs. It imports accessible L1 memory from each agent, keeps provenance and review status, detects duplicate/conflicting memories, and returns only a small relevant context pack when an agent needs past context.
 
@@ -78,7 +78,7 @@ The original implementation is intentionally small and dependency-free (Python s
 - import adapters for common text-based L1 files
 - doctor/status commands
 
-### v0.2.0-alpha.2 — repository/scope continuity baseline
+### v0.2.0-alpha.4 — deterministic continuity-gate baseline
 
 The v0.2 architecture is documented before full implementation:
 
@@ -94,21 +94,24 @@ Implemented groundwork includes:
 - Memory/Evidence separation groundwork and raw-source registration
 - package baseline under `src/agent_memory_hub`
 - domain execution/repository identity models
-- `RepositoryInspector` port
+- `RepositoryInspector` and `MemoryReader` ports
 - tested Git remote normalization and canonical repository fingerprint primitive
 - concrete local Git inspector for repository root, common-dir, worktree identity, branch, and HEAD
 - explicit scope value object and precedence: task → worktree → branch → repository → global
-- scope visibility rules that prevent worktree/branch context from leaking across unrelated repository contexts
-- CI coverage for both legacy CLI syntax and the new `src/` package
+- repository-qualified branch/worktree/task storage keys that prevent cross-repository leakage
+- typed + scope-aware SQLite/FTS5 retrieval with specificity ranking
+- deterministic `ContinuityGate` with `NO_RECALL`, `RECALL`, `ONBOARDING`, `RESUME`, and `HANDOFF` modes
+- application-level zero-read path: `NO_RECALL` never invokes the memory reader
+- bounded recall candidate limits for continuity modes
+- CI coverage for legacy CLI behavior, package unit tests, Git tests, and SQLite integration tests
 
 Next continuity work proceeds test-first:
 
-1. wire scope hierarchy into SQLite/FTS recall
-2. add typed + scope-aware retrieval ranking
-3. Continuity Gate
-4. token-budget Context Projector
-5. onboarding/resume/handoff projection presets
-6. HEAD-aware stale checkpoint handling
+1. token-budget Context Projector
+2. onboarding/resume/handoff projection policies
+3. repository-known/session-state detection adapters for seamless invocation
+4. HEAD-aware stale checkpoint handling
+5. connect the package continuity pipeline to the compatibility CLI/agent entry points
 
 ## Install as an Agent Skill
 
@@ -257,7 +260,7 @@ Context pack:
 - raw_sources introduced
 - FTS5 is the primary retrieval path
 - semantic retrieval is fallback only
-- next planned work: typed/scope-aware continuity retrieval
+- next planned work: token-budget continuity projection
 ```
 
 If two memories disagree, the hub surfaces the conflict rather than inventing a winner.
@@ -270,15 +273,16 @@ Implementation order for v0.2:
 2. evidence/raw-source model
 3. repository/worktree/branch execution identity
 4. typed/scope-aware retrieval
-5. Continuity Gate + token-budget projection
-6. onboarding/resume/handoff/worktree continuity presets
-7. cold-source index + lazy extraction interfaces
-8. conflict/update/different-context classifier
-9. quarantine + secret/contamination guards
-10. per-agent adapters and thin projections
-11. MCP gateway
-12. benchmark harness and regression gates
-13. optional semantic fallback after the fast path is measured
+5. Continuity Gate
+6. token-budget Context Projector
+7. onboarding/resume/handoff/worktree continuity presets
+8. cold-source index + lazy extraction interfaces
+9. conflict/update/different-context classifier
+10. quarantine + secret/contamination guards
+11. per-agent adapters and thin projections
+12. MCP gateway
+13. benchmark harness and regression gates
+14. optional semantic fallback after the fast path is measured
 
 `worktree-context` should remain a reference/compatibility benchmark until agent-memory-hub passes automatic repository onboarding, worktree resume, cross-agent handoff, session-reset continuity, and HEAD-aware stale detection.
 
