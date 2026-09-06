@@ -39,5 +39,6 @@ class ContinuityContextService:
             memories,
             mode=decision.mode,
             token_budget=self._token_budget,
+            stale_head=request.stale_head,
         )
         return ContinuityContextResult(decision, pack)
