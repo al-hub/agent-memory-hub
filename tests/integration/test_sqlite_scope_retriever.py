@@ -74,6 +74,15 @@ class SQLiteScopeRetrieverTest(unittest.TestCase):
         hits = reader.recall(RecallQuery("FTS5", self.context, memory_type="decision", limit=10))
         self.assertEqual([x.id for x in hits], ["r"])
 
+    def test_empty_query_browses_visible_scopes_for_session_start_projection(self):
+        reader = SQLiteMemoryReader(self.db)
+        hits = reader.recall(RecallQuery("", self.context, limit=10))
+        ids = [x.id for x in hits]
+        self.assertEqual(ids[:3], ["w", "b", "r"])
+        self.assertIn("g", ids)
+        self.assertNotIn("f", ids)
+        self.assertNotIn("s", ids)
+
 
 if __name__ == "__main__":
     unittest.main()
