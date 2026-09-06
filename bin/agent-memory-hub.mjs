@@ -13,6 +13,7 @@ import {
   installSkill,
   removeManagedHook,
   unconfigureAgent,
+  uninstallSkill,
 } from './lib/installer.mjs';
 
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -48,7 +49,7 @@ function help() {
 
 Usage:
   agent-memory-hub install [--agents all|codex,claude,gemini] [--home PATH] [--no-skill]
-  agent-memory-hub uninstall [--agents all|codex,claude,gemini] [--home PATH]
+  agent-memory-hub uninstall [--agents all|codex,claude,gemini] [--home PATH] [--no-skill]
   agent-memory-hub status [--agents all|codex,claude,gemini] [--home PATH]
 
 Current GitHub-backed npx form:
@@ -95,6 +96,7 @@ function uninstall(options) {
     const result = unconfigureAgent(agent, options.userHome);
     console.log(`${result.changed ? 'updated' : 'unchanged'} ${agent}: ${result.file}`);
   }
+  uninstallSkill({ packageRoot: PACKAGE_ROOT, skipSkill: options.skipSkill });
   const runtime = path.join(options.memoryHome, 'runtime');
   fs.rmSync(runtime, { recursive: true, force: true });
   console.log(`removed runtime: ${runtime}`);
