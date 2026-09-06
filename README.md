@@ -2,7 +2,7 @@
 
 **One trusted memory for every AI agent.**
 
-Current development baseline: **v0.2.0-alpha.15**
+Current development baseline: **v0.2.0-alpha.16**
 
 `agent-memory-hub` is a local-first shared L2 memory and continuity layer for AI coding agents. It is specialized for practical coding workflows: fast startup/resume, repository/worktree/HEAD correctness, bounded context, cross-agent handoff, and minimal manual memory commands.
 
@@ -36,6 +36,45 @@ npx -y github:al-hub/agent-memory-hub uninstall
 ```
 
 The installer installs the Agent Skill, copies a stable runtime to `~/.agent-memory-hub/runtime`, initializes the local store, and merges SessionStart hooks into Codex / Claude / Gemini configuration. Existing unrelated settings/hooks are preserved. Uninstall removes managed hooks/runtime/skill while preserving memory data.
+
+## Practical local benchmark
+
+Run the same practical baseline on a real WSL/Linux machine without cloning the repository:
+
+```bash
+npx -y github:al-hub/agent-memory-hub benchmark
+```
+
+The full benchmark measures 1k / 10k / 50k / 100k synthetic governed-memory tiers and records:
+
+- WSL version/distribution, kernel, CPU, RAM;
+- Node, Python, Git, SQLite and FTS5 availability;
+- filesystem type for the current directory, memory home, and system temp;
+- warm in-process NO_RECALL / Resume / Handoff / SessionStart latency;
+- fresh-process NO_RECALL / Resume / Handoff latency;
+- real Codex / Claude / Gemini SessionStart hook latency;
+- p50 / p95 distributions and a machine-readable JSON report.
+
+`fresh-process` means a new Python process for each continuity request. It intentionally does **not** claim to flush the operating-system page cache.
+
+For a faster smoke measurement:
+
+```bash
+npx -y github:al-hub/agent-memory-hub benchmark --quick
+```
+
+Custom example:
+
+```bash
+npx -y github:al-hub/agent-memory-hub benchmark \
+  --sizes 1000,10000,50000,100000 \
+  --warmup 5 \
+  --iterations 30 \
+  --subprocess-iterations 10 \
+  --output amh-wsl-benchmark.json
+```
+
+Default output is `./agent-memory-hub-benchmark.json`. Synthetic fixtures are temporary and are removed after the run; the real memory database is not populated with benchmark memories.
 
 ## Target experience
 
@@ -180,7 +219,7 @@ Detailed records:
 - [Single-index three-way + production adoption](docs/scope-first-single-index-alpha15.md)
 - [Benchmark plan](docs/benchmark-plan.md)
 
-Reproduce the production continuity baseline:
+Reproduce the production continuity baseline directly from a checkout:
 
 ```bash
 python3 benchmarks/continuity_baseline.py \
@@ -244,7 +283,7 @@ Default local data directory:
 
 Compatibility storage/governance commands remain available in `scripts/memory_hub.py`.
 
-## v0.2.0-alpha.15 status
+## v0.2.0-alpha.16 status
 
 Implemented and tested:
 
@@ -255,6 +294,8 @@ Implemented and tested:
 - conflict/review/stale-HEAD warnings
 - Codex / Claude / Gemini SessionStart adapters
 - npx install/status/uninstall with persistent runtime
+- npx practical machine benchmark with WSL/toolchain/filesystem metadata
+- warm core + fresh-process + real hook p50/p95 reporting
 - fail-open hooks
 - 1k / 10k / 50k / 100k p50/p95 benchmark harnesses
 - scope-first FTS ordered-result parity at every measured tier
@@ -262,18 +303,20 @@ Implemented and tested:
 - non-destructive legacy FTS migration
 - dirty-row insert/update/delete synchronization for compatibility writers
 - broad/LIKE fallback when scoped FTS is unavailable
-- Python 3.10/3.12/3.13 and Node installer CI
+- Python 3.10/3.12/3.13 and Node installer/benchmark CI
 
 ## Next work
 
 Development remains driven by practical usage rather than feature parity:
 
-1. reproduce alpha.15 on the normal WSL development machine, including cold/warm runs;
-2. add persisted Agent A → Agent B handoff and multi-worktree end-to-end fixtures;
-3. migrate/unify the useful `worktree-context` checkpoint semantics into governed `project_state` capture before archiving that separate implementation;
+1. collect and compare the alpha.16 benchmark on the normal WSL development machine;
+2. add persisted Codex → Claude → Gemini handoff end-to-end fixtures;
+3. add real Git multi-worktree end-to-end fixtures for isolation, resume, and stale-HEAD behavior;
 4. add meaningful-event capture only after continuity read behavior remains stable in real use;
 5. optimize SessionStart scope browse only if real WSL measurements justify it;
 6. add semantic fallback/MCP only where measured workflows justify them.
+
+`worktree-context` migration/archive work is intentionally outside the current `agent-memory-hub` plan.
 
 ## Safety / privacy
 
