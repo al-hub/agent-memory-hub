@@ -4,6 +4,7 @@
 This wrapper reuses the repository's continuity baseline and adds:
 - WSL / CPU / RAM / filesystem / toolchain metadata
 - fresh-process prompt continuity timings for NO_RECALL / RESUME / HANDOFF
+- startup/import/composition phase breakdown
 - a compact shareable summary plus JSON report
 
 "Warm" means the in-process core after configured warmups.
@@ -38,6 +39,7 @@ from continuity_baseline import (  # noqa: E402
     payload_meta,
     summarize_ms,
 )
+from startup_breakdown import collect_startup_breakdown  # noqa: E402
 from agent_memory_hub.infrastructure.filesystem.continuity_state_store import JsonContinuityStateStore  # noqa: E402
 from agent_memory_hub.ports.continuity_state import StoredContinuityState  # noqa: E402
 
@@ -251,7 +253,18 @@ def print_environment(env: dict) -> None:
         print(f"  fs/{name:11s} {info['type'] or 'unknown'} @ {info['mount'] or info['path']}")
 
 
+def print_startup_breakdown(startup: dict) -> None:
+    print("\nStartup/process breakdown (p50/p95 ms; diagnostic, not additive)")
+    print("  fresh Python process wall time:")
+    for name, values in startup["fresh_process_wall"].items():
+        print(f"    {name:28s} {latency_pair(values):>14s}")
+    print("  internal operation after imports:")
+    for name, values in startup["internal_after_import"].items():
+        print(f"    {name:28s} {latency_pair(values):>14s}")
+
+
 def print_summary(report: dict, output: Path) -> None:
+    print_startup_breakdown(report["startup_breakdown"])
     print("\nPractical latency summary (p50/p95 ms)")
     print("  warm = in-process after warmup; fresh = new Python process each request")
     print("  memories | warm no-recall | fresh no-recall | warm resume | fresh resume | warm handoff | fresh handoff | codex hook")
@@ -270,6 +283,7 @@ def print_summary(report: dict, output: Path) -> None:
         )
     print("\nNotes")
     print("  - fresh-process does not flush the OS page cache; it isolates Python/import/composition startup.")
+    print("  - startup phases are diagnostic and not additive.")
     print("  - benchmark uses synthetic governed memories and deletes temporary fixtures automatically.")
     print("  - p50 is median; p95 is the latency that 95% of runs finish at or below.")
     print(f"\nJSON: {output}")
@@ -293,17 +307,23 @@ def main() -> int:
 
     env = environment_info(memory_home)
     print_environment(env)
+    startup_breakdown = collect_startup_breakdown(
+        iterations=max(1, args.subprocess_iterations),
+        fixture_root=fixture_root,
+    )
 
     result = {
-        "benchmark": "agent-memory-hub-practical-machine-v1",
+        "benchmark": "agent-memory-hub-practical-machine-v2",
         "measurement_policy": "reference baseline only; not a latency promise or hard performance gate",
         "definitions": {
             "warm": "in-process continuity after configured warmups",
             "fresh_process": "new Python process per continuity request; OS page cache is not forcibly cleared",
+            "startup_breakdown": "fresh-process import walls plus internal operations after imports; diagnostic and not additive",
             "p50": "median latency",
             "p95": "95% of runs complete at or below this latency",
         },
         "environment": env,
+        "startup_breakdown": startup_breakdown,
         "config": {
             "sizes": sizes,
             "warmup": max(0, args.warmup),
