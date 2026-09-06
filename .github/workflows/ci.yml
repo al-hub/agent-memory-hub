@@ -20,6 +20,7 @@ jobs:
       - name: Syntax check
         run: |
           python -m py_compile scripts/memory_hub.py
+          python -m py_compile benchmarks/continuity_baseline.py
           python -m compileall -q src
       - name: Tests
         run: python -m unittest discover -s tests -v
@@ -39,3 +40,25 @@ jobs:
           node --check bin/agent-memory-hub.mjs
           node --check bin/lib/installer.mjs
           npm test
+
+  benchmark-baseline:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Continuity baseline
+        run: |
+          python benchmarks/continuity_baseline.py \
+            --sizes 1000,10000 \
+            --warmup 5 \
+            --iterations 30 \
+            --subprocess-iterations 10 \
+            --output benchmark-results.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: continuity-benchmark-baseline
+          path: benchmark-results.json
