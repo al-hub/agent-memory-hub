@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-memory-hub"
-version = "0.2.0a1"
+version = "0.2.0a11"
 description = "Trusted shared L2 memory and continuity layer for AI coding agents"
 requires-python = ">=3.10"
 license = {text = "MIT"}
