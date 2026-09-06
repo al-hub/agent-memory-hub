@@ -91,14 +91,14 @@ def collect_startup_breakdown(
         repo, context = create_repo(base)
         db = home / "memory.db"
         create_database(db, context, 1000)
-        # The real steady-state hook sees an already migrated scope index. Migrate
-        # outside timed child operations so composition timing reflects that path.
+        # Prompt recall sees an already migrated scope index in normal steady use.
         ensure_single_index_scope_fts(db)
 
         fresh_cases = {
             "python_empty": "pass",
             "import_sqlite3": "import sqlite3",
             "import_session_adapter": "import agent_memory_hub.cli.session_hook",
+            "import_session_continuity": "import agent_memory_hub.cli.session_continuity",
             "import_hook_command": "import agent_memory_hub.cli.hook_command",
             "import_continuity": "import agent_memory_hub.cli.continuity",
         }
@@ -111,6 +111,12 @@ def collect_startup_breakdown(
         repo_literal = repr(str(repo))
         db_literal = repr(str(db))
         internal_cases = {
+            "build_session_start_after_import": (
+                "import time; from pathlib import Path; "
+                "from agent_memory_hub.cli.session_continuity import build_session_start_command; "
+                f"h=Path({home_literal}); t=time.perf_counter_ns(); "
+                "build_session_start_command(h); print((time.perf_counter_ns()-t)/1_000_000)"
+            ),
             "build_continuity_after_import": (
                 "import time; from pathlib import Path; "
                 "from agent_memory_hub.cli.continuity import build_continuity_command; "
@@ -137,7 +143,7 @@ def collect_startup_breakdown(
         }
 
         return {
-            "benchmark": "agent-memory-hub-startup-breakdown-v1",
+            "benchmark": "agent-memory-hub-startup-breakdown-v2",
             "iterations": iterations,
             "fresh_process_wall": fresh,
             "internal_after_import": internal,
