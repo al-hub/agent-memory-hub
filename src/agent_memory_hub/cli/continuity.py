@@ -35,6 +35,9 @@ class ContinuityCommand:
                 "session_reset": result.state.session_reset,
                 "session_has_context": result.state.session_has_context,
                 "stale_head": result.state.stale_head,
+                "agent_changed": result.state.agent_changed,
+                "previous_agent": result.state.previous_agent,
+                "current_agent": result.state.current_agent,
             },
             "estimated_tokens": pack.estimated_tokens if pack else 0,
             "token_budget": pack.token_budget if pack else 0,
@@ -61,7 +64,7 @@ class ContinuityCommand:
         state = payload["state"]
         flags = [
             name
-            for name in ("repository_known", "session_reset", "stale_head")
+            for name in ("repository_known", "session_reset", "stale_head", "agent_changed")
             if state[name]
         ]
         if flags:
@@ -90,6 +93,7 @@ class ContinuityCommand:
         token_budget: int,
         json_output: bool,
         session_source: str | None = None,
+        agent: str | None = None,
     ) -> str:
         # token_budget is accepted here so all entry points share one stable CLI
         # contract. The real composition root configures the service with it.
@@ -101,6 +105,7 @@ class ContinuityCommand:
             session_id=session_id,
             session_has_context=session_has_context,
             session_source=session_source,
+            agent=agent,
         )
         result = self._seamless_service.handle(observation)
         payload = self._payload(result)
