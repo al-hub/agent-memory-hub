@@ -32,8 +32,8 @@ class FakeProjector:
         self.pack = pack
         self.calls = []
 
-    def project(self, candidates, *, mode, token_budget=1000, policy=None):
-        self.calls.append((tuple(candidates), mode, token_budget))
+    def project(self, candidates, *, mode, token_budget=1000, policy=None, stale_head=False):
+        self.calls.append((tuple(candidates), mode, token_budget, stale_head))
         return self.pack
 
 
@@ -92,7 +92,23 @@ class ContinuityContextServiceTest(unittest.TestCase):
         self.assertEqual(len(reader.calls), 1)
         self.assertEqual(reader.calls[0].context, self.request.context)
         self.assertEqual(reader.calls[0].limit, 8)
-        self.assertEqual(projector.calls, [(tuple(memories), ContinuityMode.RESUME, 900)])
+        self.assertEqual(projector.calls, [(tuple(memories), ContinuityMode.RESUME, 900, False)])
+
+    def test_stale_head_is_forwarded_to_projector(self):
+        gate = FakeGate(ContinuityDecision(ContinuityMode.RESUME, "resume wording"))
+        reader = FakeReader([memory()])
+        projector = FakeProjector(ContextPack(ContinuityMode.RESUME, (), 0, 900, False))
+        service = ContinuityContextService(gate, reader, projector, token_budget=900)
+        request = ContinuityRequest(
+            message=self.request.message,
+            context=self.request.context,
+            repository_known=True,
+            stale_head=True,
+        )
+
+        service.handle(request)
+
+        self.assertTrue(projector.calls[0][3])
 
     def test_onboarding_uses_larger_candidate_window_but_same_projection_budget(self):
         gate = FakeGate(ContinuityDecision(ContinuityMode.ONBOARDING, "known repo"))
