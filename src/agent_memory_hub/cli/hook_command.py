@@ -4,15 +4,19 @@ import json
 from pathlib import Path
 
 from agent_memory_hub.cli.session_continuity import build_session_start_command
-from agent_memory_hub.cli.session_hook import AgentKind, SessionHookAdapter
+from agent_memory_hub.cli.session_hook_protocol import (
+    normalize_agent,
+    parse_session_start,
+    render_session_start_output,
+)
 
 
 class SessionStartHookCommand:
     """Bridge supported agent SessionStart hooks to the lightweight continuity path."""
 
-    def __init__(self, home: str | Path, agent: AgentKind | str, *, token_budget: int = 1000):
+    def __init__(self, home: str | Path, agent, *, token_budget: int = 1000):
         self._home = Path(home).expanduser()
-        self._adapter = SessionHookAdapter(agent)
+        self._agent = normalize_agent(agent)
         self._token_budget = max(1, token_budget)
 
     def _context_text(self, payload: dict) -> str:
@@ -33,17 +37,20 @@ class SessionStartHookCommand:
         return "\n".join(lines)
 
     def handle(self, hook_payload: dict) -> str:
-        invocation = self._adapter.parse(hook_payload)
+        session_id, cwd, source, has_context, _ = parse_session_start(
+            self._agent,
+            hook_payload,
+        )
         command = build_session_start_command(self._home, token_budget=self._token_budget)
         raw = command.run(
             message="",
-            cwd=invocation.cwd,
-            session_id=invocation.session_id,
-            session_has_context=invocation.session_has_context,
-            session_source=invocation.session_source,
-            agent=invocation.agent.value,
+            cwd=cwd,
+            session_id=session_id,
+            session_has_context=has_context,
+            session_source=source,
+            agent=self._agent,
             token_budget=self._token_budget,
             json_output=True,
         )
         payload = json.loads(raw)
-        return self._adapter.render_output(self._context_text(payload))
+        return render_session_start_output(self._context_text(payload))
