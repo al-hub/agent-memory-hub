@@ -10,11 +10,13 @@ Raw evidence is canonical. Governed memories and summaries are rebuildable index
 
 ## One-command install
 
-Until the scoped npm package is published:
+Until the scoped npm package is published, the GitHub-backed form must explicitly opt in to Git fetching on npm 12+:
 
 ```bash
-npx -y github:al-hub/agent-memory-hub install
+npx --allow-git=all -y github:al-hub/agent-memory-hub install
 ```
+
+This opts in for that command only; it does not require changing the global npm policy.
 
 After npm publication the same CLI contract will be:
 
@@ -25,14 +27,14 @@ npx -y @al-hub/agent-memory-hub@latest install
 Install selected agents only:
 
 ```bash
-npx -y github:al-hub/agent-memory-hub install --agents codex,claude
+npx --allow-git=all -y github:al-hub/agent-memory-hub install --agents codex,claude
 ```
 
 Status / uninstall:
 
 ```bash
-npx -y github:al-hub/agent-memory-hub status
-npx -y github:al-hub/agent-memory-hub uninstall
+npx --allow-git=all -y github:al-hub/agent-memory-hub status
+npx --allow-git=all -y github:al-hub/agent-memory-hub uninstall
 ```
 
 The installer installs the Agent Skill, copies a stable runtime to `~/.agent-memory-hub/runtime`, initializes the local store, and merges SessionStart hooks into Codex / Claude / Gemini configuration. Existing unrelated settings/hooks are preserved. Uninstall removes managed hooks/runtime/skill while preserving memory data.
@@ -42,7 +44,7 @@ The installer installs the Agent Skill, copies a stable runtime to `~/.agent-mem
 Run the same practical baseline on a real WSL/Linux machine without cloning the repository:
 
 ```bash
-npx -y github:al-hub/agent-memory-hub benchmark
+npx --allow-git=all -y github:al-hub/agent-memory-hub benchmark
 ```
 
 The full benchmark measures 1k / 10k / 50k / 100k synthetic governed-memory tiers and records:
@@ -60,13 +62,13 @@ The full benchmark measures 1k / 10k / 50k / 100k synthetic governed-memory tier
 For a faster smoke measurement:
 
 ```bash
-npx -y github:al-hub/agent-memory-hub benchmark --quick
+npx --allow-git=all -y github:al-hub/agent-memory-hub benchmark --quick
 ```
 
 Custom example:
 
 ```bash
-npx -y github:al-hub/agent-memory-hub benchmark \
+npx --allow-git=all -y github:al-hub/agent-memory-hub benchmark \
   --sizes 1000,10000,50000,100000 \
   --warmup 5 \
   --iterations 30 \
