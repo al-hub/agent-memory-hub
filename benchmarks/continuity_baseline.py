@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Reproducible local baseline for real-world agent continuity latency.
+"""Reproducible local baseline for practical agent continuity latency.
 
-This benchmark intentionally measures two layers:
-1. in-process continuity commands (Git + state + SQLite + projection)
-2. SessionStart hook subprocess latency (Python startup included)
+This benchmark measures three views of the same real-world path:
+1. end-to-end in-process continuity scenarios
+2. isolated local phases (Git/state/SQLite/projection)
+3. SessionStart hook subprocess latency (Python startup included)
 
 It is a baseline recorder, not a CI performance gate. Shared CI runners are noisy;
 compare distributions and trends rather than treating one run as a promise.
@@ -28,9 +29,14 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from agent_memory_hub.application.context_projector import ContextProjector  # noqa: E402
 from agent_memory_hub.cli.continuity import build_continuity_command  # noqa: E402
+from agent_memory_hub.domain.continuity import ContinuityMode  # noqa: E402
+from agent_memory_hub.domain.recall import RecallQuery  # noqa: E402
 from agent_memory_hub.infrastructure.filesystem.continuity_state_store import JsonContinuityStateStore  # noqa: E402
 from agent_memory_hub.infrastructure.git.repository_inspector import GitRepositoryInspector  # noqa: E402
+from agent_memory_hub.infrastructure.sqlite.repository_knowledge import SQLiteRepositoryKnowledgeReader  # noqa: E402
+from agent_memory_hub.infrastructure.sqlite.retriever import SQLiteMemoryReader  # noqa: E402
 from agent_memory_hub.ports.continuity_state import StoredContinuityState  # noqa: E402
 
 HOOK_SCRIPT = ROOT / "scripts" / "session_start_hook.py"
@@ -255,6 +261,57 @@ def benchmark_tier(memory_count: int, *, warmup: int, iterations: int, subproces
             )
             scenarios[name] = {**summarize_ms(timings), **payload_meta(last)}
 
+        # Isolated phase timings are diagnostic and are NOT additive. Each measures
+        # one component repeatedly with its normal local I/O behavior.
+        inspector = GitRepositoryInspector()
+        knowledge_reader = SQLiteRepositoryKnowledgeReader(db_path)
+        memory_reader = SQLiteMemoryReader(db_path)
+        projector = ContextProjector()
+        checkpoint("phase-session", head1)
+        browse_query = RecallQuery("", context, limit=12)
+        fts_query = RecallQuery("architecture implementation", context, limit=8)
+        browse_candidates = memory_reader.recall(browse_query)
+
+        isolated_phases = {}
+        phase_cases = {
+            "python_startup": (
+                lambda: subprocess.run(
+                    [sys.executable, "-c", "pass"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ),
+                min(warmup, 2),
+                subprocess_iterations,
+            ),
+            "git_inspect": (lambda: inspector.inspect(str(repo)), warmup, iterations),
+            "repository_known": (lambda: knowledge_reader.has_repository(repo_id), warmup, iterations),
+            "checkpoint_load": (lambda: state_store.load(repo_id, worktree_id), warmup, iterations),
+            "checkpoint_save": (
+                lambda: checkpoint("phase-session", head1),
+                warmup,
+                iterations,
+            ),
+            "sqlite_scope_browse": (lambda: memory_reader.recall(browse_query), warmup, iterations),
+            "sqlite_fts_recall": (lambda: memory_reader.recall(fts_query), warmup, iterations),
+            "project_resume": (
+                lambda: projector.project(
+                    browse_candidates,
+                    mode=ContinuityMode.RESUME,
+                    token_budget=1000,
+                ),
+                warmup,
+                iterations,
+            ),
+        }
+        for name, (fn, phase_warmup, phase_iterations) in phase_cases.items():
+            timings, _ = measure(
+                fn,
+                warmup=phase_warmup,
+                iterations=max(1, phase_iterations),
+            )
+            isolated_phases[name] = summarize_ms(timings)
+
         # Make HEAD stale, then restore the old checkpoint before every timed call.
         (repo / "CHANGE.md").write_text("new head\n", encoding="utf-8")
         run_git("add", "CHANGE.md", cwd=repo)
@@ -316,6 +373,7 @@ def benchmark_tier(memory_count: int, *, warmup: int, iterations: int, subproces
             "db_bytes": db_path.stat().st_size,
             "visible_memory_target": min(64, max(16, memory_count // 100)),
             "scenarios": scenarios,
+            "isolated_phases": isolated_phases,
         }
 
 
@@ -328,7 +386,7 @@ def parse_sizes(raw: str) -> list[int]:
 
 def main() -> int:
     p = argparse.ArgumentParser(prog="continuity-baseline")
-    p.add_argument("--sizes", default="1000,10000")
+    p.add_argument("--sizes", default="1000,10000,50000,100000")
     p.add_argument("--warmup", type=int, default=5)
     p.add_argument("--iterations", type=int, default=30)
     p.add_argument("--subprocess-iterations", type=int, default=10)
@@ -337,8 +395,12 @@ def main() -> int:
 
     sizes = parse_sizes(args.sizes)
     result = {
-        "benchmark": "agent-memory-hub-continuity-baseline-v1",
+        "benchmark": "agent-memory-hub-continuity-baseline-v2",
         "measurement_policy": "reference baseline only; not a performance promise or CI gate",
+        "percentiles": {
+            "p50": "median: 50% of runs complete at or below this latency",
+            "p95": "tail indicator: 95% of runs complete at or below this latency",
+        },
         "environment": {
             "python": platform.python_version(),
             "platform": platform.platform(),
@@ -369,6 +431,12 @@ def main() -> int:
         for name, values in tier["scenarios"].items():
             print(
                 f"  {name:26s} p50={values['p50_ms']:8.3f} ms "
+                f"p95={values['p95_ms']:8.3f} ms"
+            )
+        print("  isolated phases (diagnostic, not additive):")
+        for name, values in tier["isolated_phases"].items():
+            print(
+                f"    {name:24s} p50={values['p50_ms']:8.3f} ms "
                 f"p95={values['p95_ms']:8.3f} ms"
             )
 
