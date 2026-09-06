@@ -22,6 +22,7 @@ class ContinuityRequest:
     session_has_context: bool = True
     session_reset: bool = False
     stale_head: bool = False
+    session_source: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
