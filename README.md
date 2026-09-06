@@ -2,7 +2,7 @@
 
 **One trusted memory for every AI agent.**
 
-Current development baseline: **v0.2.0-alpha.14**
+Current development baseline: **v0.2.0-alpha.15**
 
 `agent-memory-hub` is a local-first shared L2 memory and continuity layer for AI coding agents. It is specialized for practical coding workflows: fast startup/resume, repository/worktree/HEAD correctness, bounded context, cross-agent handoff, and minimal manual memory commands.
 
@@ -35,16 +35,7 @@ npx -y github:al-hub/agent-memory-hub status
 npx -y github:al-hub/agent-memory-hub uninstall
 ```
 
-The installer:
-
-```text
-installs the Agent Skill
-+ copies a stable runtime to ~/.agent-memory-hub/runtime
-+ initializes the local store
-+ merges SessionStart hooks into Codex / Claude / Gemini config
-```
-
-Existing unrelated settings/hooks are preserved. Install is idempotent and config files receive one-time `.agent-memory-hub.bak` backups. Uninstall removes managed hooks/runtime/skill while preserving memory data.
+The installer installs the Agent Skill, copies a stable runtime to `~/.agent-memory-hub/runtime`, initializes the local store, and merges SessionStart hooks into Codex / Claude / Gemini configuration. Existing unrelated settings/hooks are preserved. Uninstall removes managed hooks/runtime/skill while preserving memory data.
 
 ## Target experience
 
@@ -72,7 +63,7 @@ Continuity Gate
   ├─ RESUME
   └─ HANDOFF
   ↓ only when needed
-scope-aware SQLite recall / bounded scope browse
+scope-first SQLite FTS / bounded SessionStart scope browse
   ↓
 governance + stale-HEAD handling
   ↓
@@ -103,13 +94,13 @@ fork     → RESUME where supported
 
 Hook failures are fail-open: memory problems must never prevent the coding agent itself from starting.
 
-At SessionStart there may be no user prompt yet, so the system uses bounded visible-scope browse instead of lexical search:
+At SessionStart there may be no user prompt, so the system uses bounded visible-scope browse instead of lexical search:
 
 ```text
 worktree → branch → repository → global
 ```
 
-## Scope and stale state
+## Scope model
 
 Visibility precedence:
 
@@ -119,73 +110,77 @@ task > worktree > branch > repository > global
 
 Branch/worktree/task refs are repository-qualified. If repository HEAD changes, volatile `project_state` is demoted and marked `STALE_HEAD`; stable verified decisions and constraints remain available unless independently invalidated.
 
-## Practical performance baseline
+## Scope-first FTS is now the production recall path
 
-The benchmark is a **reference baseline, not a competitive score, latency promise, or CI threshold**. It exists so practical specialization can be judged against measured behavior.
+The pre-alpha.15 lexical path matched statement text broadly and applied repository/worktree scope after FTS matching. Synthetic 100k-memory tests showed that foreign repositories sharing the same lexical terms caused recall to grow toward ~100 ms and beyond.
 
-Recorded on a GitHub Actions Ubuntu 24.04 runner with Python 3.12.14, 5 warmups, 30 in-process iterations, and 10 hook subprocess iterations.
-
-### End-to-end p50 / p95
-
-| Memories | NO_RECALL | Resume prompt | SessionStart resume | Codex hook |
-| ---: | ---: | ---: | ---: | ---: |
-| 1k | 8.63 / 9.67 ms | 11.41 / 13.68 ms | 9.51 / 9.81 ms | 90.92 / 93.07 ms |
-| 10k | 8.54 / 8.78 ms | 21.89 / 22.47 ms | 11.85 / 12.39 ms | 92.57 / 95.78 ms |
-| 50k | 8.58 / 8.92 ms | 78.00 / 78.81 ms | 21.81 / 22.72 ms | 103.14 / 104.78 ms |
-| 100k | 8.49 / 8.66 ms | 146.37 / 149.18 ms | 35.22 / 36.39 ms | 117.76 / 120.25 ms |
-
-`p50` is the median: 50% of runs complete at or below it. `p95` is a tail-latency indicator: 95% of runs complete at or below it.
-
-### Isolated phase p50
-
-These phase timings are diagnostic and **not additive**.
-
-| Phase | 1k | 10k | 50k | 100k |
-| --- | ---: | ---: | ---: | ---: |
-| Python startup | 10.79 ms | 10.83 ms | 11.07 ms | 10.90 ms |
-| Git inspect | 7.96 ms | 8.04 ms | 8.08 ms | 8.01 ms |
-| Repository-known | 0.214 ms | 0.164 ms | 0.171 ms | 0.169 ms |
-| Checkpoint load | 0.024 ms | 0.024 ms | 0.024 ms | 0.024 ms |
-| Checkpoint save | 0.188 ms | 0.204 ms | 0.215 ms | 0.207 ms |
-| SQLite scope browse | 0.637 ms | 2.851 ms | 12.668 ms | 25.279 ms |
-| SQLite FTS recall | 1.873 ms | 12.919 ms | 67.874 ms | 135.944 ms |
-| Projection | 0.086 ms | 0.086 ms | 0.086 ms | 0.086 ms |
-
-The first strong scale signal is clear:
+The production layout is now one FTS index:
 
 ```text
-NO_RECALL              stays essentially flat
-Git/Python              are fixed costs
-state/governance        are negligible
-scope browse            grows with archive size
-prompt FTS recall       is the primary scale-sensitive path
+memory_fts(id, statement, scope_key)
 ```
 
-### Scope-first FTS A/B experiment
+`scope_key` is a tokenizer-safe deterministic token derived from `(scope, scope_ref)`. Prompt recall intersects visible scope postings and statement postings inside FTS5 before joining governed memories.
 
-The first scope-first experiment keeps the existing broad FTS reader as the control and adds a separate experimental FTS index containing a deterministic `(scope, scope_ref)` token. FTS5 can therefore intersect visible scope postings with lexical postings before joining governed memories.
+### Three-way validation
 
-Ordered top-8 result IDs were identical at every measured tier.
+Broad FTS, the earlier two-index experiment, and the new single-index layout were measured on identical corpora and queries. Ordered top-8 result IDs were identical at every tier.
 
-| Memories | Broad FTS p50 | Scope-first p50 | p50 speedup | Scope-first extra storage |
-| ---: | ---: | ---: | ---: | ---: |
-| 1k | 1.781 ms | 0.637 ms | 2.80x | 0.23 MiB |
-| 10k | 13.247 ms | 1.382 ms | 9.59x | 2.11 MiB |
-| 50k | 68.842 ms | 4.044 ms | 17.02x | 9.86 MiB |
-| 100k | 138.777 ms | 7.362 ms | 18.85x | 21.10 MiB |
+| Memories | Broad p50 | Two-index p50 | Single-index p50 | Single speedup | Two-index extra | Single-index extra |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1k | 1.032 ms | 0.344 ms | 0.324 ms | 3.19x | 0.23 MiB | 0.03 MiB |
+| 10k | 9.142 ms | 0.877 ms | 0.811 ms | 11.27x | 2.11 MiB | 0.33 MiB |
+| 50k | 42.121 ms | 2.502 ms | 2.449 ms | 17.20x | 9.86 MiB | 0.46 MiB |
+| 100k | 85.547 ms | 4.494 ms | 4.450 ms | **19.22x** | 21.10 MiB | **3.02 MiB** |
 
-At 100k memories the experiment reduces lexical retrieval from roughly 139 ms to roughly 7 ms p50 while preserving ordered top-k parity. This validates scope-first retrieval as a strong optimization candidate.
+The single-index layout keeps the scope-first speedup while removing most duplicate-index storage.
 
-It is **not the production default yet**. The first A/B implementation deliberately maintains a second full FTS index so control and experiment can coexist cleanly. Before adoption, the same scope-token idea should be integrated into a storage-efficient single-index layout with safe migration/backfill.
+### Production continuity baseline after adoption
+
+After switching the real continuity composition to the single-index reader:
+
+| Memories | NO_RECALL p50 | Resume p50 | Handoff p50 | SessionStart resume p50 | Codex hook p50 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1k | 9.087 ms | 10.361 ms | 10.228 ms | 9.722 ms | 89.184 ms |
+| 10k | 8.651 ms | 10.345 ms | 10.264 ms | 11.989 ms | 93.028 ms |
+| 50k | 8.723 ms | 13.256 ms | 12.996 ms | 22.136 ms | 103.489 ms |
+| 100k | 8.723 ms | **16.547 ms** | **16.538 ms** | 34.983 ms | 116.151 ms |
+
+The pre-adoption 100k resume/handoff baseline was roughly **146 ms p50**. The production prompt-facing path is now about **16.5 ms p50** while NO_RECALL remains flat.
+
+SessionStart is intentionally different: with no prompt it uses bounded scope browse, so lexical scope-first FTS does not change that path in the same way.
+
+These measurements are reference baselines, not latency guarantees or CI performance gates.
+
+## Non-destructive FTS migration and legacy synchronization
+
+Continuity now calls `ensure_single_index_scope_fts()` before composing the reader.
+
+The governed `memories` table is never rewritten by this migration. A legacy two-column `memory_fts(id, statement)` is rebuildable cache, so it is safely reconstructed as the single scope-aware index.
+
+```text
+legacy two-column FTS
+  ↓
+rebuild FTS only
+  ↓
+memory_fts(id, statement, scope_key)
+```
+
+Compatibility writers can still write the legacy `(id, statement)` shape. Small triggers record changed `memories.rowid` values in `scope_fts_dirty`; the next continuity entry repairs only those dirty FTS rows and handles insert/update/delete. Clean read paths do not rebuild the archive.
+
+If migration cannot run because the store is missing/incompatible/locked, continuity fails safe and the existing broad/LIKE fallback remains available.
+
+## Performance records
 
 Detailed records:
 
 - [First 1k/10k baseline](docs/baseline-alpha11.md)
 - [1k–100k scale + phase breakdown](docs/baseline-alpha12-scale.md)
-- [Scope-first FTS A/B](docs/scope-first-fts-ab-alpha13.md)
+- [Two-index scope-first A/B](docs/scope-first-fts-ab-alpha13.md)
+- [Single-index three-way + production adoption](docs/scope-first-single-index-alpha15.md)
 - [Benchmark plan](docs/benchmark-plan.md)
 
-Reproduce the control baseline:
+Reproduce the production continuity baseline:
 
 ```bash
 python3 benchmarks/continuity_baseline.py \
@@ -196,17 +191,17 @@ python3 benchmarks/continuity_baseline.py \
   --output benchmark-results.json
 ```
 
-Reproduce the A/B experiment:
+Reproduce the three-way comparison:
 
 ```bash
-python3 benchmarks/scope_first_ab.py \
+python3 benchmarks/scope_first_three_way.py \
   --sizes 1000,10000,50000,100000 \
   --warmup 5 \
   --iterations 30 \
-  --output scope-first-ab-results.json
+  --output scope-first-three-way-results.json
 ```
 
-CI uploads `continuity-benchmark-baseline` and `scope-first-fts-ab`. The A/B job fails if ordered result IDs diverge.
+CI uploads both benchmark artifacts. The three-way job fails if ordered result IDs diverge.
 
 ## Memory governance
 
@@ -249,39 +244,36 @@ Default local data directory:
 
 Compatibility storage/governance commands remain available in `scripts/memory_hub.py`.
 
-## v0.2.0-alpha.14 status
+## v0.2.0-alpha.15 status
 
 Implemented and tested:
 
 - governed Memory/Evidence/raw-source groundwork
 - canonical repository/worktree/branch/HEAD identity
 - repository-qualified scope isolation
-- SQLite FTS5 fast path + bounded SessionStart scope browse
 - deterministic Continuity Gate and bounded projector
 - conflict/review/stale-HEAD warnings
 - Codex / Claude / Gemini SessionStart adapters
 - npx install/status/uninstall with persistent runtime
 - fail-open hooks
-- reproducible p50/p95 practical benchmark harness
-- isolated phase timing breakdown
-- 1k / 10k / 50k / 100k archive tiers
-- experimental `ScopeFirstSQLiteMemoryReader` with safe broad-reader fallback
-- scope-token FTS A/B harness with ordered-result parity gate
-- measured 2.80x → 18.85x p50 scope-first speedup from 1k → 100k
-- machine-readable baseline and A/B benchmark artifacts
+- 1k / 10k / 50k / 100k p50/p95 benchmark harnesses
+- scope-first FTS ordered-result parity at every measured tier
+- production single-index `memory_fts(id, statement, scope_key)` reader
+- non-destructive legacy FTS migration
+- dirty-row insert/update/delete synchronization for compatibility writers
+- broad/LIKE fallback when scoped FTS is unavailable
 - Python 3.10/3.12/3.13 and Node installer CI
 
 ## Next work
 
-Development is driven by practical usage rather than feature parity:
+Development remains driven by practical usage rather than feature parity:
 
-1. test a storage-efficient **single-index scope-token FTS layout** against both broad FTS and the validated two-index experiment;
-2. require ordered-result parity, worktree/repository isolation, and governance-filter parity before default adoption;
-3. add non-destructive scoped-index migration/backfill and write/update synchronization;
-4. reproduce 1k–100k results on the normal WSL development machine;
-5. add persisted Agent A → Agent B handoff and multi-worktree end-to-end fixtures;
-6. add meaningful-event capture only after continuity read-path behavior is stable;
-7. add semantic fallback/MCP only where measured workflows justify them.
+1. reproduce alpha.15 on the normal WSL development machine, including cold/warm runs;
+2. add persisted Agent A → Agent B handoff and multi-worktree end-to-end fixtures;
+3. migrate/unify the useful `worktree-context` checkpoint semantics into governed `project_state` capture before archiving that separate implementation;
+4. add meaningful-event capture only after continuity read behavior remains stable in real use;
+5. optimize SessionStart scope browse only if real WSL measurements justify it;
+6. add semantic fallback/MCP only where measured workflows justify them.
 
 ## Safety / privacy
 
