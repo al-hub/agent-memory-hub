@@ -2,7 +2,11 @@
 
 **One trusted memory for every AI agent.**
 
-`agent-memory-hub` is a local-first L2 memory layer for coding agents and LLM CLIs. It imports accessible L1 memory from each agent, keeps provenance and review status, detects duplicate/conflicting memories, and returns only a small relevant context pack when an agent needs past context.
+Current development baseline: **v0.2.0-alpha.1**
+
+`agent-memory-hub` is a local-first L2 memory and continuity layer for coding agents and LLM CLIs. It imports accessible L1 memory from each agent, keeps provenance and review status, detects duplicate/conflicting memories, and returns only a small relevant context pack when an agent needs past context.
+
+The product goal is broader than storage: **an agent should be able to continue useful prior work across agent/session/repository/worktree boundaries without making the user restate context.**
 
 ## Why
 
@@ -25,12 +29,44 @@ The design rule is simple: **raw evidence is canonical; summaries are indexes, n
 - Keep the fast path local: metadata + SQLite FTS5 first; semantic search is optional fallback.
 - Project only thin instructions/pointers back into agent L1 files.
 - Make normal use nearly invisible to the user.
+- Recall proactively when continuity matters; do nothing when prior context cannot materially affect the task.
+- Treat onboarding, resume, handoff, and worktree continuation as projections over the same governed L2 memory.
+
+## Seamless continuity target
+
+With the skill installed, users should normally be able to say things like:
+
+```text
+"이어서 구현해줘."
+"아까 하던 성능 분석 계속해."
+"Claude가 하던 작업을 Codex에서 이어서 해."
+```
+
+without manually asking for a memory lookup or maintaining a separate handoff file as the source of truth.
+
+The target pipeline is:
+
+```text
+user request
+  ↓
+cheap Continuity Gate
+  ↓ only when relevant
+repository/worktree/task scope
+  ↓
+FTS5/BM25 fast recall
+  ↓
+governance filter
+  ↓
+token-budget context projection
+  ↓
+agent continues work
+```
 
 ## Design status
 
 ### v0.1 — working prototype
 
-The current implementation is intentionally small and dependency-free (Python standard library):
+The original implementation is intentionally small and dependency-free (Python standard library):
 
 - SQLite database with FTS5 when available
 - append-only event log
@@ -42,25 +78,34 @@ The current implementation is intentionally small and dependency-free (Python st
 - import adapters for common text-based L1 files
 - doctor/status commands
 
-### v0.2 — specification frozen before implementation
+### v0.2.0-alpha.1 — package/TDD continuity baseline
 
-The next architecture is documented before code changes:
+The v0.2 architecture is documented before full implementation:
 
 - [Architecture v0.2](docs/ARCHITECTURE-v0.2.md)
 - [Schema v2](docs/schema-v2.md)
 - [L1 migration & bootstrap workflow](docs/migration-workflow.md)
 - [Benchmark plan](docs/benchmark-plan.md)
+- [TDD/SOLID development guide](docs/DEVELOPMENT.md)
 
-Key v0.2 changes:
+Implemented groundwork includes:
 
-- separate **Memory** from **Evidence**
-- split governance into lifecycle / review state / confidence
-- add explicit scope and typed memory
-- reversible quarantine instead of destructive cleaning
-- lazy extraction of large historical L1/session archives
-- thin L2 → L1 projection and optional hot cache
-- adapter/MCP/hook architecture
-- benchmark conflict, temporal updates, contamination, provenance and latency
+- non-destructive v1 → v2 schema migration path
+- Memory/Evidence separation groundwork and raw-source registration
+- package baseline under `src/agent_memory_hub`
+- domain execution/repository identity models
+- `RepositoryInspector` port
+- tested Git remote normalization and canonical repository fingerprint primitive
+- CI coverage for both legacy CLI syntax and the new `src/` package
+
+Next continuity work proceeds test-first:
+
+1. Git repository/worktree/branch/HEAD inspector
+2. explicit scope hierarchy including worktree/branch/task
+3. typed + scope-aware retrieval
+4. Continuity Gate
+5. token-budget Context Projector
+6. onboarding/resume/handoff projection presets
 
 ## Install as an Agent Skill
 
@@ -70,7 +115,9 @@ The repository contains a root `SKILL.md`, so it can be installed with the open 
 npx skills@latest add al-hub/agent-memory-hub -g
 ```
 
-## Local CLI — v0.1
+The skill is designed to recall prior context proactively when continuity materially matters; the user should not need to explicitly say "use agent-memory-hub".
+
+## Local CLI — compatibility path
 
 Clone the repository and run:
 
@@ -97,7 +144,7 @@ Override with:
 export AGENT_MEMORY_HUB_HOME=/path/to/memory
 ```
 
-## Bootstrap existing L1 — v0.1
+## Bootstrap existing L1
 
 Preview discovered sources:
 
@@ -111,9 +158,9 @@ Import them:
 python3 scripts/memory_hub.py import-l1
 ```
 
-The v0.1 adapter intentionally imports only accessible text files and never claims access to private product memory that is not present on disk. Add or override files explicitly with `--source PATH`.
+The current adapter imports only accessible text files and never claims access to private product memory that is not present on disk. Add or override files explicitly with `--source PATH`.
 
-v0.2 will replace eager structured import with a faster bootstrap model:
+The v0.2 bootstrap direction replaces eager full-corpus understanding with:
 
 ```text
 Discover L1
@@ -147,7 +194,7 @@ confidence:
   0.0 .. 1.0
 ```
 
-Memory is also typed and scoped so unrelated contexts do not create false conflicts.
+Memory is typed and scoped so unrelated contexts do not create false conflicts.
 
 ## Fast retrieval path
 
@@ -163,7 +210,21 @@ query
 
 The normal path deliberately avoids embeddings and external services.
 
-## v0.1 commands
+## Development discipline
+
+Long-term development follows:
+
+```text
+RED → GREEN → REFACTOR → PERF
+```
+
+Core logic follows SOLID boundaries so Git, SQLite, source adapters, retrieval strategies, and projection presets can evolve without turning the memory core into one large conditional script. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+The main product regression metric is **Continuity Success Rate**:
+
+> Can the agent continue the correct work without asking the user to restate previously available project context?
+
+## Current compatibility commands
 
 ```text
 init        initialize L2 storage
@@ -181,17 +242,19 @@ doctor      validate DB, FTS, event log and source paths
 After weeks of work across agents:
 
 ```text
-User: What did we decide about the Rust repository layout?
+User: 이어서 구현해줘.
 
-Agent → shared L2 recall
+Codex
+  → recognizes repository/worktree continuity
+  → shared L2 recall
 
 Context pack:
-- active / verified / decision
-  Rust implementation uses a separate repository.
-  evidence: user decision + prior session
-
-- superseded
-  Earlier discussion considered a single repository.
+- schema v2 migration implemented
+- Memory/Evidence separated
+- raw_sources introduced
+- FTS5 is the primary retrieval path
+- semantic retrieval is fallback only
+- next planned work: typed/scope-aware continuity retrieval
 ```
 
 If two memories disagree, the hub surfaces the conflict rather than inventing a winner.
@@ -202,14 +265,19 @@ Implementation order for v0.2:
 
 1. schema-v2 migration with lossless v0.1 compatibility
 2. evidence/raw-source model
-3. typed/scope-aware retrieval
-4. cold-source index + lazy extraction interfaces
-5. conflict/update/different-context classifier
-6. quarantine + secret/contamination guards
-7. per-agent adapters and thin projections
-8. MCP gateway
-9. benchmark harness and regression gates
-10. optional semantic fallback after the fast path is measured
+3. repository/worktree/branch execution identity
+4. typed/scope-aware retrieval
+5. Continuity Gate + token-budget projection
+6. onboarding/resume/handoff/worktree continuity presets
+7. cold-source index + lazy extraction interfaces
+8. conflict/update/different-context classifier
+9. quarantine + secret/contamination guards
+10. per-agent adapters and thin projections
+11. MCP gateway
+12. benchmark harness and regression gates
+13. optional semantic fallback after the fast path is measured
+
+`worktree-context` should remain a reference/compatibility benchmark until agent-memory-hub passes automatic repository onboarding, worktree resume, cross-agent handoff, session-reset continuity, and HEAD-aware stale detection.
 
 ## Safety / privacy
 
