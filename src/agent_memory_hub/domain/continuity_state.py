@@ -25,6 +25,7 @@ class ContinuityState:
     agent_changed: bool = False
     previous_agent: str | None = None
     current_agent: str | None = None
+    clone_resume: bool = False
 
     def to_request(self, observation: ContinuityObservation) -> ContinuityRequest:
         return ContinuityRequest(
@@ -38,4 +39,5 @@ class ContinuityState:
             agent_changed=self.agent_changed,
             previous_agent=self.previous_agent,
             current_agent=self.current_agent,
+            clone_resume=self.clone_resume,
         )

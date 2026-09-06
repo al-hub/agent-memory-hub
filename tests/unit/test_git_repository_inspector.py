@@ -30,16 +30,25 @@ class GitRepositoryInspectorTest(unittest.TestCase):
         self.assertEqual(ctx.branch, "main")
         self.assertEqual(len(ctx.head_sha), 40)
         self.assertTrue(ctx.worktree_id)
+        self.assertTrue(ctx.checkout_id)
+        self.assertFalse(ctx.is_linked_worktree)
         self.assertEqual(Path(ctx.repository.root), self.root.resolve())
 
-    def test_linked_worktree_shares_repository_identity_but_has_distinct_worktree_id(self):
+    def test_linked_worktree_shares_repository_and_checkout_but_has_distinct_worktree_id(self):
         wt = Path(self.tmp.name) / "feature-wt"
-        subprocess.run(["git", "-C", str(self.root), "worktree", "add", "-b", "feature/test", str(wt)], check=True, capture_output=True)
+        subprocess.run(
+            ["git", "-C", str(self.root), "worktree", "add", "-b", "feature/test", str(wt)],
+            check=True,
+            capture_output=True,
+        )
         main_ctx = self.inspector.inspect(str(self.root))
         wt_ctx = self.inspector.inspect(str(wt))
         self.assertEqual(main_ctx.repository.canonical_id, wt_ctx.repository.canonical_id)
         self.assertEqual(main_ctx.repository.common_dir, wt_ctx.repository.common_dir)
+        self.assertEqual(main_ctx.checkout_id, wt_ctx.checkout_id)
         self.assertNotEqual(main_ctx.worktree_id, wt_ctx.worktree_id)
+        self.assertFalse(main_ctx.is_linked_worktree)
+        self.assertTrue(wt_ctx.is_linked_worktree)
         self.assertEqual(wt_ctx.branch, "feature/test")
 
     def test_non_git_directory_returns_empty_execution_context(self):
@@ -50,6 +59,8 @@ class GitRepositoryInspectorTest(unittest.TestCase):
         self.assertIsNone(ctx.worktree_id)
         self.assertIsNone(ctx.branch)
         self.assertIsNone(ctx.head_sha)
+        self.assertIsNone(ctx.checkout_id)
+        self.assertFalse(ctx.is_linked_worktree)
 
 
 if __name__ == "__main__":

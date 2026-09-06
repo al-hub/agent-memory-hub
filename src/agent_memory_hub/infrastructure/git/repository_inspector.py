@@ -9,7 +9,7 @@ from agent_memory_hub.domain.context import ExecutionContext, RepositoryIdentity
 
 
 class GitRepositoryInspector:
-    """Discover repository, worktree, branch, and HEAD using local git only."""
+    """Discover repository, checkout, worktree, branch, and HEAD using local git only."""
 
     def _git(self, cwd: str, *args: str) -> str | None:
         result = subprocess.run(
@@ -49,6 +49,7 @@ class GitRepositoryInspector:
             common_dir=common_dir,
             remote=remote,
         )
+        checkout_hash = hashlib.sha256(common_dir.encode("utf-8")).hexdigest()[:16]
         worktree_hash = hashlib.sha256(git_dir.encode("utf-8")).hexdigest()[:16]
         branch = self._git(root, "symbolic-ref", "--quiet", "--short", "HEAD")
         head_sha = self._git(root, "rev-parse", "HEAD")
@@ -57,4 +58,6 @@ class GitRepositoryInspector:
             worktree_id=f"wt:{worktree_hash}",
             branch=branch,
             head_sha=head_sha,
+            checkout_id=f"co:{checkout_hash}",
+            is_linked_worktree=git_dir != common_dir,
         )

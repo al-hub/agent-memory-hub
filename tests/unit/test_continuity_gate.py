@@ -87,6 +87,18 @@ class ContinuityGateTest(unittest.TestCase):
         ))
         self.assertEqual(decision.mode, ContinuityMode.ONBOARDING)
 
+    def test_compatible_new_clone_resumes_on_startup_without_wording(self):
+        decision = self.gate.decide(ContinuityRequest(
+            "",
+            self.context,
+            repository_known=True,
+            session_has_context=False,
+            session_source="startup",
+            clone_resume=True,
+        ))
+        self.assertEqual(decision.mode, ContinuityMode.RESUME)
+        self.assertIn("new clone", decision.reason)
+
     def test_explicit_past_decision_question_triggers_recall(self):
         decision = self.gate.decide(ContinuityRequest("전에 SQLite로 결정했던 이유가 뭐였지?", self.context))
         self.assertEqual(decision.mode, ContinuityMode.RECALL)

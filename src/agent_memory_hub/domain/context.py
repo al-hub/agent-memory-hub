@@ -32,6 +32,8 @@ class ExecutionContext:
     branch: Optional[str] = None
     head_sha: Optional[str] = None
     task: Optional[str] = None
+    checkout_id: Optional[str] = None
+    is_linked_worktree: bool = False
 
 
 @dataclass(frozen=True, slots=True)

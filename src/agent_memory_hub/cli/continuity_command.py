@@ -25,6 +25,7 @@ class ContinuityCommand:
                 "agent_changed": result.state.agent_changed,
                 "previous_agent": result.state.previous_agent,
                 "current_agent": result.state.current_agent,
+                "clone_resume": result.state.clone_resume,
             },
             "estimated_tokens": pack.estimated_tokens if pack else 0,
             "token_budget": pack.token_budget if pack else 0,
@@ -48,7 +49,7 @@ class ContinuityCommand:
         state = payload["state"]
         flags = [
             name
-            for name in ("repository_known", "session_reset", "stale_head", "agent_changed")
+            for name in ("repository_known", "session_reset", "stale_head", "agent_changed", "clone_resume")
             if state[name]
         ]
         if flags:

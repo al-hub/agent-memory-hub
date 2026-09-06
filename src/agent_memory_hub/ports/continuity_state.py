@@ -9,6 +9,8 @@ class StoredContinuityState:
     session_id: str | None = None
     head_sha: str | None = None
     agent: str | None = None
+    branch: str | None = None
+    checkout_id: str | None = None
 
 
 class RepositoryKnowledgeReader(Protocol):
@@ -18,6 +20,15 @@ class RepositoryKnowledgeReader(Protocol):
 
 class ContinuityStateStore(Protocol):
     def load(self, repository_id: str, worktree_id: str | None) -> StoredContinuityState | None:
+        ...
+
+    def load_compatible_checkout(
+        self,
+        repository_id: str,
+        checkout_id: str,
+        head_sha: str,
+        branch: str | None,
+    ) -> StoredContinuityState | None:
         ...
 
     def save(self, repository_id: str, worktree_id: str | None, state: StoredContinuityState) -> None:

@@ -26,6 +26,7 @@ class ContinuityRequest:
     agent_changed: bool = False
     previous_agent: str | None = None
     current_agent: str | None = None
+    clone_resume: bool = False
 
 
 @dataclass(frozen=True, slots=True)

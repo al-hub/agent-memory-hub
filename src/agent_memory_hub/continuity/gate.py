@@ -55,6 +55,12 @@ class ContinuityGate:
         if request.session_reset and request.repository_known:
             return ContinuityDecision(ContinuityMode.RESUME, "known repository after session reset")
 
+        if request.repository_known and request.clone_resume:
+            return ContinuityDecision(
+                ContinuityMode.RESUME,
+                "known repository in compatible new clone",
+            )
+
         if self._RESUME.search(message):
             return ContinuityDecision(ContinuityMode.RESUME, "resume wording")
 

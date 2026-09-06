@@ -34,11 +34,64 @@ class ContinuityStateAdaptersTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "continuity.json"
             store = JsonContinuityStateStore(path)
-            state = StoredContinuityState(session_id="s1", head_sha="abc")
+            state = StoredContinuityState(
+                session_id="s1",
+                head_sha="abc",
+                agent="codex",
+                branch="main",
+                checkout_id="co:1",
+            )
             store.save("github.com/al-hub/demo", "wt:1", state)
 
             self.assertEqual(store.load("github.com/al-hub/demo", "wt:1"), state)
             self.assertIsNone(store.load("github.com/al-hub/demo", "wt:2"))
+
+    def test_json_state_store_finds_only_other_checkout_with_compatible_head_and_branch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "continuity.json"
+            store = JsonContinuityStateStore(path)
+            state = StoredContinuityState(
+                session_id="s1",
+                head_sha="abc",
+                agent="codex",
+                branch="main",
+                checkout_id="co:old",
+            )
+            store.save("github.com/al-hub/demo", "wt:old", state)
+
+            self.assertEqual(
+                store.load_compatible_checkout(
+                    "github.com/al-hub/demo",
+                    "co:new",
+                    "abc",
+                    "main",
+                ),
+                state,
+            )
+            self.assertIsNone(
+                store.load_compatible_checkout(
+                    "github.com/al-hub/demo",
+                    "co:old",
+                    "abc",
+                    "main",
+                )
+            )
+            self.assertIsNone(
+                store.load_compatible_checkout(
+                    "github.com/al-hub/demo",
+                    "co:new",
+                    "different",
+                    "main",
+                )
+            )
+            self.assertIsNone(
+                store.load_compatible_checkout(
+                    "github.com/al-hub/demo",
+                    "co:new",
+                    "abc",
+                    "feature",
+                )
+            )
 
 
 if __name__ == "__main__":
