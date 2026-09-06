@@ -53,7 +53,7 @@ jobs:
       - name: Continuity baseline
         run: |
           python benchmarks/continuity_baseline.py \
-            --sizes 1000,10000 \
+            --sizes 1000,10000,50000,100000 \
             --warmup 5 \
             --iterations 30 \
             --subprocess-iterations 10 \
