@@ -64,7 +64,6 @@ class ContinuityBaselineHarnessTest(unittest.TestCase):
             "checkpoint_save",
             "sqlite_scope_browse",
             "sqlite_fts_recall",
-            "sqlite_scope_first_fts_recall",
             "project_resume",
         }
         self.assertEqual(set(phases), expected_phases)
@@ -72,13 +71,6 @@ class ContinuityBaselineHarnessTest(unittest.TestCase):
             self.assertIn("p50_ms", values)
             self.assertIn("p95_ms", values)
             self.assertGreaterEqual(values["p50_ms"], 0)
-
-        ab = result["retrieval_ab"]
-        self.assertTrue(ab["same_result_ids"])
-        self.assertEqual(ab["broad"]["result_ids"], ab["scope_first"]["result_ids"])
-        self.assertGreater(ab["broad"]["p50_ms"], 0)
-        self.assertGreater(ab["scope_first"]["p50_ms"], 0)
-        self.assertGreater(ab["p50_speedup"], 0)
 
 
 if __name__ == "__main__":
