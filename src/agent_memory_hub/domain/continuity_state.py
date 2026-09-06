@@ -12,6 +12,7 @@ class ContinuityObservation:
     context: ExecutionContext
     session_id: str | None = None
     session_has_context: bool = True
+    session_source: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,4 +30,5 @@ class ContinuityState:
             session_has_context=self.session_has_context,
             session_reset=self.session_reset,
             stale_head=self.stale_head,
+            session_source=observation.session_source,
         )
