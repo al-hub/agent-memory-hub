@@ -2,7 +2,7 @@
 
 **One trusted memory for every AI agent.**
 
-Current development baseline: **v0.2.0-alpha.4**
+Current development baseline: **v0.2.0-alpha.5**
 
 `agent-memory-hub` is a local-first L2 memory and continuity layer for coding agents and LLM CLIs. It imports accessible L1 memory from each agent, keeps provenance and review status, detects duplicate/conflicting memories, and returns only a small relevant context pack when an agent needs past context.
 
@@ -78,7 +78,7 @@ The original implementation is intentionally small and dependency-free (Python s
 - import adapters for common text-based L1 files
 - doctor/status commands
 
-### v0.2.0-alpha.4 — deterministic continuity-gate baseline
+### v0.2.0-alpha.5 — bounded continuity projection baseline
 
 The v0.2 architecture is documented before full implementation:
 
@@ -94,7 +94,7 @@ Implemented groundwork includes:
 - Memory/Evidence separation groundwork and raw-source registration
 - package baseline under `src/agent_memory_hub`
 - domain execution/repository identity models
-- `RepositoryInspector` and `MemoryReader` ports
+- `RepositoryInspector`, `MemoryReader`, and `ProjectionPolicy` ports
 - tested Git remote normalization and canonical repository fingerprint primitive
 - concrete local Git inspector for repository root, common-dir, worktree identity, branch, and HEAD
 - explicit scope value object and precedence: task → worktree → branch → repository → global
@@ -103,15 +103,17 @@ Implemented groundwork includes:
 - deterministic `ContinuityGate` with `NO_RECALL`, `RECALL`, `ONBOARDING`, `RESUME`, and `HANDOFF` modes
 - application-level zero-read path: `NO_RECALL` never invokes the memory reader
 - bounded recall candidate limits for continuity modes
-- CI coverage for legacy CLI behavior, package unit tests, Git tests, and SQLite integration tests
+- pure `ContextProjector` that defensively filters stale lifecycles, deduplicates equivalent statements, preserves conflict/review warnings, and enforces a hard token budget
+- mode-specific projection policies for recall, onboarding, resume, and handoff without branching the projector core
+- CI coverage for legacy CLI behavior, package unit tests, Git tests, SQLite integration tests, continuity gate tests, and projector tests
 
 Next continuity work proceeds test-first:
 
-1. token-budget Context Projector
-2. onboarding/resume/handoff projection policies
-3. repository-known/session-state detection adapters for seamless invocation
-4. HEAD-aware stale checkpoint handling
-5. connect the package continuity pipeline to the compatibility CLI/agent entry points
+1. compose `ContinuityGate → MemoryReader → ContextProjector` into one application use case
+2. repository-known/session-state detection adapters for seamless invocation
+3. HEAD-aware stale checkpoint handling
+4. connect the package continuity pipeline to the compatibility CLI/agent entry points
+5. add measured token/latency regression fixtures
 
 ## Install as an Agent Skill
 
@@ -251,16 +253,16 @@ After weeks of work across agents:
 User: 이어서 구현해줘.
 
 Codex
-  → recognizes repository/worktree continuity
-  → shared L2 recall
+  → Continuity Gate selects resume
+  → repository/worktree scoped FTS5 recall
+  → governed, deduplicated, token-budgeted context projection
 
 Context pack:
-- schema v2 migration implemented
-- Memory/Evidence separated
-- raw_sources introduced
-- FTS5 is the primary retrieval path
-- semantic retrieval is fallback only
-- next planned work: token-budget continuity projection
+- current task and next action
+- verified architectural decisions
+- active constraints
+- relevant failures/lessons
+- unresolved conflicts clearly marked as warnings
 ```
 
 If two memories disagree, the hub surfaces the conflict rather than inventing a winner.
@@ -276,13 +278,15 @@ Implementation order for v0.2:
 5. Continuity Gate
 6. token-budget Context Projector
 7. onboarding/resume/handoff/worktree continuity presets
-8. cold-source index + lazy extraction interfaces
-9. conflict/update/different-context classifier
-10. quarantine + secret/contamination guards
-11. per-agent adapters and thin projections
-12. MCP gateway
-13. benchmark harness and regression gates
-14. optional semantic fallback after the fast path is measured
+8. seamless invocation/session-state adapters
+9. HEAD-aware stale handling
+10. cold-source index + lazy extraction interfaces
+11. conflict/update/different-context classifier
+12. quarantine + secret/contamination guards
+13. per-agent adapters and thin projections
+14. MCP gateway
+15. benchmark harness and regression gates
+16. optional semantic fallback after the fast path is measured
 
 `worktree-context` should remain a reference/compatibility benchmark until agent-memory-hub passes automatic repository onboarding, worktree resume, cross-agent handoff, session-reset continuity, and HEAD-aware stale detection.
 
