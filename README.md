@@ -22,14 +22,15 @@ The design rule is simple: **raw evidence is canonical; summaries are indexes, n
 - Bootstrap from existing L1 instead of starting from zero.
 - Keep source provenance for every memory.
 - Never silently overwrite conflicts.
-- Distinguish confirmed, uncertain, needs-review, stale and superseded context.
 - Keep the fast path local: metadata + SQLite FTS5 first; semantic search is optional fallback.
 - Project only thin instructions/pointers back into agent L1 files.
 - Make normal use nearly invisible to the user.
 
-## v0.1 scope
+## Design status
 
-The first implementation is intentionally small and dependency-free (Python standard library):
+### v0.1 — working prototype
+
+The current implementation is intentionally small and dependency-free (Python standard library):
 
 - SQLite database with FTS5 when available
 - append-only event log
@@ -41,6 +42,26 @@ The first implementation is intentionally small and dependency-free (Python stan
 - import adapters for common text-based L1 files
 - doctor/status commands
 
+### v0.2 — specification frozen before implementation
+
+The next architecture is documented before code changes:
+
+- [Architecture v0.2](docs/ARCHITECTURE-v0.2.md)
+- [Schema v2](docs/schema-v2.md)
+- [L1 migration & bootstrap workflow](docs/migration-workflow.md)
+- [Benchmark plan](docs/benchmark-plan.md)
+
+Key v0.2 changes:
+
+- separate **Memory** from **Evidence**
+- split governance into lifecycle / review state / confidence
+- add explicit scope and typed memory
+- reversible quarantine instead of destructive cleaning
+- lazy extraction of large historical L1/session archives
+- thin L2 → L1 projection and optional hot cache
+- adapter/MCP/hook architecture
+- benchmark conflict, temporal updates, contamination, provenance and latency
+
 ## Install as an Agent Skill
 
 The repository contains a root `SKILL.md`, so it can be installed with the open Agent Skills CLI:
@@ -49,9 +70,7 @@ The repository contains a root `SKILL.md`, so it can be installed with the open 
 npx skills@latest add al-hub/agent-memory-hub -g
 ```
 
-The skills CLI discovers a repository-root `SKILL.md` and can install skills to multiple supported agents. See the upstream skills CLI documentation for agent-specific destinations.
-
-## Local CLI
+## Local CLI — v0.1
 
 Clone the repository and run:
 
@@ -78,7 +97,7 @@ Override with:
 export AGENT_MEMORY_HUB_HOME=/path/to/memory
 ```
 
-## Bootstrap existing L1
+## Bootstrap existing L1 — v0.1
 
 Preview discovered sources:
 
@@ -94,42 +113,57 @@ python3 scripts/memory_hub.py import-l1
 
 The v0.1 adapter intentionally imports only accessible text files and never claims access to private product memory that is not present on disk. Add or override files explicitly with `--source PATH`.
 
-## Memory governance
-
-A memory has a type, status and evidence trail. Example:
-
-```yaml
-type: decision
-status: confirmed
-confidence: 0.96
-context_quality: clear
-statement: Rust implementation uses a separate repository.
-sources:
-  - agent: codex
-    pointer: ~/.codex/...
-```
-
-Supported statuses:
+v0.2 will replace eager structured import with a faster bootstrap model:
 
 ```text
-candidate | confirmed | needs_review | conflict | superseded | stale | rejected
+Discover L1
+  → preserve/register raw sources
+  → hash + metadata/FTS index
+  → ready immediately
+  → lazily extract structured memories only when relevant
 ```
 
-The hub does not treat three agents repeating the same source as three independent facts. Provenance remains attached so later consolidation can reason about evidence groups.
+## Memory governance — v0.2 direction
+
+A memory claim and its evidence become separate records:
+
+```text
+Memory
+  ├─ Evidence A → raw transcript
+  ├─ Evidence B → project file
+  └─ Evidence C → explicit user decision
+```
+
+Governance uses independent axes:
+
+```text
+lifecycle:
+  candidate | active | superseded | archived | quarantined
+
+review_state:
+  verified | unverified | needs_review | conflict
+
+confidence:
+  0.0 .. 1.0
+```
+
+Memory is also typed and scoped so unrelated contexts do not create false conflicts.
 
 ## Fast retrieval path
 
 ```text
 query
-  -> metadata filters
-  -> SQLite FTS5/BM25
-  -> compact context pack
-  -> optional semantic fallback (future)
+  → scope/type filter
+  → SQLite FTS5/BM25
+  → governance filter
+  → optional semantic fallback
+  → optional rerank only when necessary
+  → compact context pack
 ```
 
 The normal path deliberately avoids embeddings and external services.
 
-## Commands
+## v0.1 commands
 
 ```text
 init        initialize L2 storage
@@ -142,38 +176,44 @@ import-l1   discover and import accessible L1 text files
 doctor      validate DB, FTS, event log and source paths
 ```
 
-## Example
+## Example target experience
 
 After weeks of work across agents:
 
 ```text
 User: What did we decide about the Rust repository layout?
 
-Agent -> memory-hub recall
+Agent → shared L2 recall
 
 Context pack:
-- [confirmed, 0.96] Rust implementation uses a separate repository.
-  reason/source pointer available
-- [superseded] Earlier discussion considered a single repository.
+- active / verified / decision
+  Rust implementation uses a separate repository.
+  evidence: user decision + prior session
+
+- superseded
+  Earlier discussion considered a single repository.
 ```
 
 If two memories disagree, the hub surfaces the conflict rather than inventing a winner.
 
 ## Roadmap
 
-- richer Claude/Codex/Gemini session adapters
-- automatic capture hooks where an agent supports them
-- L1 -> L2 consolidation rules
-- evidence-group aware confidence updates
-- temporal validity (`valid_from`, `valid_until`)
-- optional embeddings/reranking fallback
-- thin L2 -> L1 projections (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`)
-- background-safe dedupe/cleaning commands
-- packaging as a single binary once the schema stabilizes
+Implementation order for v0.2:
+
+1. schema-v2 migration with lossless v0.1 compatibility
+2. evidence/raw-source model
+3. typed/scope-aware retrieval
+4. cold-source index + lazy extraction interfaces
+5. conflict/update/different-context classifier
+6. quarantine + secret/contamination guards
+7. per-agent adapters and thin projections
+8. MCP gateway
+9. benchmark harness and regression gates
+10. optional semantic fallback after the fast path is measured
 
 ## Safety / privacy
 
-Memory is local by default. The hub should never upload raw conversations implicitly. Import only sources the user can access and explicitly configured paths. Sensitive source files should remain protected by normal filesystem permissions.
+Memory is local by default. The hub should never upload raw conversations implicitly. Import only sources the user can access and explicitly configured paths. External LLM extraction must be opt-in/configured. Suspicious or noisy content should be quarantined rather than silently promoted or destructively deleted.
 
 ## License
 
