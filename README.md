@@ -2,7 +2,7 @@
 
 **One trusted memory for every AI agent.**
 
-Current development baseline: **v0.2.0-alpha.1**
+Current development baseline: **v0.2.0-alpha.2**
 
 `agent-memory-hub` is a local-first L2 memory and continuity layer for coding agents and LLM CLIs. It imports accessible L1 memory from each agent, keeps provenance and review status, detects duplicate/conflicting memories, and returns only a small relevant context pack when an agent needs past context.
 
@@ -78,7 +78,7 @@ The original implementation is intentionally small and dependency-free (Python s
 - import adapters for common text-based L1 files
 - doctor/status commands
 
-### v0.2.0-alpha.1 — package/TDD continuity baseline
+### v0.2.0-alpha.2 — repository/scope continuity baseline
 
 The v0.2 architecture is documented before full implementation:
 
@@ -96,16 +96,19 @@ Implemented groundwork includes:
 - domain execution/repository identity models
 - `RepositoryInspector` port
 - tested Git remote normalization and canonical repository fingerprint primitive
+- concrete local Git inspector for repository root, common-dir, worktree identity, branch, and HEAD
+- explicit scope value object and precedence: task → worktree → branch → repository → global
+- scope visibility rules that prevent worktree/branch context from leaking across unrelated repository contexts
 - CI coverage for both legacy CLI syntax and the new `src/` package
 
 Next continuity work proceeds test-first:
 
-1. Git repository/worktree/branch/HEAD inspector
-2. explicit scope hierarchy including worktree/branch/task
-3. typed + scope-aware retrieval
-4. Continuity Gate
-5. token-budget Context Projector
-6. onboarding/resume/handoff projection presets
+1. wire scope hierarchy into SQLite/FTS recall
+2. add typed + scope-aware retrieval ranking
+3. Continuity Gate
+4. token-budget Context Projector
+5. onboarding/resume/handoff projection presets
+6. HEAD-aware stale checkpoint handling
 
 ## Install as an Agent Skill
 
