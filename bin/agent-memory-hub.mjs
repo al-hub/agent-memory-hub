@@ -15,8 +15,21 @@ import {
   unconfigureAgent,
   uninstallSkill,
 } from './lib/installer.mjs';
+import { runBenchmark } from './lib/benchmark.mjs';
 
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+function parseNonNegativeInt(value, name) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`${name} must be a non-negative integer`);
+  return parsed;
+}
+
+function parsePositiveInt(value, name) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`${name} must be a positive integer`);
+  return parsed;
+}
 
 function parseArgs(argv) {
   const command = argv[0] || 'install';
@@ -26,6 +39,14 @@ function parseArgs(argv) {
     memoryHome: path.join(os.homedir(), '.agent-memory-hub'),
     userHome: os.homedir(),
     skipSkill: false,
+    benchmark: {
+      quick: false,
+      sizes: null,
+      warmup: null,
+      iterations: null,
+      subprocessIterations: null,
+      output: null,
+    },
   };
   for (let i = 1; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -35,7 +56,13 @@ function parseArgs(argv) {
     else if (arg === '--agents') {
       const value = argv[++i];
       options.agents = value === 'all' ? [...AGENTS] : value.split(',').map(x => x.trim()).filter(Boolean);
-    } else if (arg === '--help' || arg === '-h') options.command = 'help';
+    } else if (arg === '--quick') options.benchmark.quick = true;
+    else if (arg === '--sizes') options.benchmark.sizes = argv[++i];
+    else if (arg === '--warmup') options.benchmark.warmup = parseNonNegativeInt(argv[++i], '--warmup');
+    else if (arg === '--iterations') options.benchmark.iterations = parsePositiveInt(argv[++i], '--iterations');
+    else if (arg === '--subprocess-iterations') options.benchmark.subprocessIterations = parsePositiveInt(argv[++i], '--subprocess-iterations');
+    else if (arg === '--output') options.benchmark.output = argv[++i];
+    else if (arg === '--help' || arg === '-h') options.command = 'help';
     else throw new Error(`Unknown option: ${arg}`);
   }
   for (const agent of options.agents) {
@@ -51,12 +78,23 @@ Usage:
   agent-memory-hub install [--agents all|codex,claude,gemini] [--home PATH] [--no-skill]
   agent-memory-hub uninstall [--agents all|codex,claude,gemini] [--home PATH] [--no-skill]
   agent-memory-hub status [--agents all|codex,claude,gemini] [--home PATH]
+  agent-memory-hub benchmark [--quick] [--sizes LIST] [--warmup N] [--iterations N]\
+ [--subprocess-iterations N] [--output PATH] [--home PATH]
+
+Benchmark defaults:
+  sizes: 1000,10000,50000,100000
+  warm core: 5 warmups / 30 iterations
+  fresh-process + hook: 10 measured iterations
+  output: ./agent-memory-hub-benchmark.json
+
+Quick benchmark:
+  agent-memory-hub benchmark --quick
 
 Current GitHub-backed npx form:
-  npx -y github:al-hub/agent-memory-hub install
+  npx -y github:al-hub/agent-memory-hub benchmark
 
 After npm publication:
-  npx -y @al-hub/agent-memory-hub@latest install
+  npx -y @al-hub/agent-memory-hub@latest benchmark
 `;
 }
 
@@ -120,7 +158,13 @@ try {
   else if (options.command === 'install') install(options);
   else if (options.command === 'uninstall') uninstall(options);
   else if (options.command === 'status') status(options);
-  else throw new Error(`Unknown command: ${options.command}`);
+  else if (options.command === 'benchmark') {
+    runBenchmark({
+      packageRoot: PACKAGE_ROOT,
+      memoryHome: options.memoryHome,
+      rawOptions: options.benchmark,
+    });
+  } else throw new Error(`Unknown command: ${options.command}`);
 } catch (error) {
   console.error(`agent-memory-hub: ${error.message}`);
   process.exitCode = 1;
