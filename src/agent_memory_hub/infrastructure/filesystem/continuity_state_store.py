@@ -31,6 +31,7 @@ class JsonContinuityStateStore:
         return StoredContinuityState(
             session_id=raw.get("session_id"),
             head_sha=raw.get("head_sha"),
+            agent=raw.get("agent"),
         )
 
     def save(self, repository_id: str, worktree_id: str | None, state: StoredContinuityState) -> None:
@@ -38,6 +39,7 @@ class JsonContinuityStateStore:
         data[self._key(repository_id, worktree_id)] = {
             "session_id": state.session_id,
             "head_sha": state.head_sha,
+            "agent": state.agent,
         }
         self._path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self._path.with_suffix(self._path.suffix + ".tmp")
