@@ -69,6 +69,8 @@ python3 ~/.agent-memory-hub/runtime/scripts/continuity_context.py \
 
 Treat `mode: no_recall` as success. Do not fall back to broad history search simply because no memory was returned.
 
+The production prompt-recall path is scope-first SQLite FTS. Repository/worktree/branch scope is intersected inside FTS before lexical candidates expand. The entry point also non-destructively upgrades legacy two-column FTS indexes and repairs dirty compatibility-writer rows before recall. If that scoped index is unavailable, broad/LIKE fallback remains valid.
+
 Manual direct recall is for explicit historical lookup or deliberately narrow queries:
 
 ```bash
@@ -145,11 +147,13 @@ Compatibility write example:
 
 ```bash
 python3 ~/.agent-memory-hub/runtime/scripts/memory_hub.py add \
-  "FTS5 is the primary recall path." \
+  "Scope-first FTS is the production prompt-recall path." \
   --type decision \
   --status confirmed \
   --source-agent codex
 ```
+
+Compatibility writes are synchronized into the scope-aware FTS at the next continuity entry; durable truth remains in `memories`/evidence, not the FTS cache.
 
 ## Evidence and conflicts
 
