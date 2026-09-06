@@ -46,7 +46,7 @@ export function findPython() {
   throw new Error('Python 3.10+ is required for benchmark');
 }
 
-export function runBenchmark({ packageRoot, rawOptions = {}, cwd = process.cwd() }) {
+export function runBenchmark({ packageRoot, memoryHome, rawOptions = {}, cwd = process.cwd() }) {
   const config = resolveBenchmarkConfig(rawOptions, cwd);
   const python = findPython();
   fs.mkdirSync(path.dirname(config.output), { recursive: true });
@@ -55,12 +55,14 @@ export function runBenchmark({ packageRoot, rawOptions = {}, cwd = process.cwd()
   console.log(`mode: ${rawOptions.quick ? 'quick' : 'full'}`);
   console.log(`tiers: ${config.sizes}`);
   console.log(`python: ${python}`);
+  console.log(`memory-home filesystem target: ${memoryHome}`);
   console.log('measurement: warm in-process core + fresh-process continuity + real SessionStart hooks');
 
   const result = spawnSync(python, buildBenchmarkArgs(packageRoot, config), {
     cwd,
     env: {
       ...process.env,
+      AGENT_MEMORY_HUB_HOME: memoryHome,
       AGENT_MEMORY_HUB_BENCHMARK_NODE: process.version,
       AGENT_MEMORY_HUB_BENCHMARK_HOST: os.hostname(),
     },
