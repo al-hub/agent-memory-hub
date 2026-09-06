@@ -2,7 +2,7 @@
 
 **One trusted memory for every AI agent.**
 
-Current development baseline: **v0.2.0-alpha.5**
+Current development baseline: **v0.2.0-alpha.6**
 
 `agent-memory-hub` is a local-first L2 memory and continuity layer for coding agents and LLM CLIs. It imports accessible L1 memory from each agent, keeps provenance and review status, detects duplicate/conflicting memories, and returns only a small relevant context pack when an agent needs past context.
 
@@ -78,7 +78,7 @@ The original implementation is intentionally small and dependency-free (Python s
 - import adapters for common text-based L1 files
 - doctor/status commands
 
-### v0.2.0-alpha.5 — bounded continuity projection baseline
+### v0.2.0-alpha.6 — composed continuity context baseline
 
 The v0.2 architecture is documented before full implementation:
 
@@ -105,15 +105,17 @@ Implemented groundwork includes:
 - bounded recall candidate limits for continuity modes
 - pure `ContextProjector` that defensively filters stale lifecycles, deduplicates equivalent statements, preserves conflict/review warnings, and enforces a hard token budget
 - mode-specific projection policies for recall, onboarding, resume, and handoff without branching the projector core
-- CI coverage for legacy CLI behavior, package unit tests, Git tests, SQLite integration tests, continuity gate tests, and projector tests
+- composed `ContinuityContextService` that executes Gate → scoped Recall → bounded Projection as one application use case
+- zero-work continuity fast path: `NO_RECALL` skips both memory retrieval and projection
+- CI coverage for legacy CLI behavior, package unit tests, Git tests, SQLite integration tests, continuity gate tests, projector tests, and composition tests
 
 Next continuity work proceeds test-first:
 
-1. compose `ContinuityGate → MemoryReader → ContextProjector` into one application use case
-2. repository-known/session-state detection adapters for seamless invocation
-3. HEAD-aware stale checkpoint handling
-4. connect the package continuity pipeline to the compatibility CLI/agent entry points
-5. add measured token/latency regression fixtures
+1. repository-known/session-state detection adapters for seamless invocation
+2. HEAD-aware stale checkpoint handling
+3. connect the package continuity pipeline to compatibility CLI/agent entry points
+4. add measured token/latency regression fixtures
+5. add end-to-end onboarding/resume/handoff continuity scenarios
 
 ## Install as an Agent Skill
 
@@ -277,16 +279,17 @@ Implementation order for v0.2:
 4. typed/scope-aware retrieval
 5. Continuity Gate
 6. token-budget Context Projector
-7. onboarding/resume/handoff/worktree continuity presets
-8. seamless invocation/session-state adapters
-9. HEAD-aware stale handling
-10. cold-source index + lazy extraction interfaces
-11. conflict/update/different-context classifier
-12. quarantine + secret/contamination guards
-13. per-agent adapters and thin projections
-14. MCP gateway
-15. benchmark harness and regression gates
-16. optional semantic fallback after the fast path is measured
+7. composed ContinuityContextService
+8. onboarding/resume/handoff/worktree continuity presets
+9. seamless invocation/session-state adapters
+10. HEAD-aware stale handling
+11. cold-source index + lazy extraction interfaces
+12. conflict/update/different-context classifier
+13. quarantine + secret/contamination guards
+14. per-agent adapters and thin projections
+15. MCP gateway
+16. benchmark harness and regression gates
+17. optional semantic fallback after the fast path is measured
 
 `worktree-context` should remain a reference/compatibility benchmark until agent-memory-hub passes automatic repository onboarding, worktree resume, cross-agent handoff, session-reset continuity, and HEAD-aware stale detection.
 
