@@ -14,6 +14,29 @@ Use `agent-memory-hub` as a shared, agent-independent L2 memory and continuity l
 - Raw evidence is canonical. Summaries/memories are indexes and interpretations, not unquestionable truth.
 - Continuity should feel seamless: recall useful prior context when needed without requiring the user to say "use memory" or name this skill.
 
+## Default seamless path
+
+For continuity-sensitive work, prefer the seamless continuity entry point over manual broad recall:
+
+```bash
+python3 scripts/continuity_context.py "<current user/task message>" --cwd "$PWD" --json
+```
+
+When a stable agent session id is available, pass it:
+
+```bash
+python3 scripts/continuity_context.py "<current user/task message>" \
+  --cwd "$PWD" \
+  --session-id "<session-id>" \
+  --json
+```
+
+If the current agent session has little or no useful L1 context, such as immediately after a clear/reset or first entry into an existing project, add `--empty-session`.
+
+The command automatically performs local repository/worktree/branch/HEAD inspection, continuity-state detection, the cheap Continuity Gate, scoped SQLite/FTS retrieval when needed, governance filtering, stale-HEAD handling, deduplication, and bounded context projection.
+
+Treat `mode: no_recall` as a successful fast-path result: do not fall back to broad memory search unless the task itself explicitly requires historical lookup.
+
 ## Continuity gate
 
 Before recalling, cheaply decide whether prior context can materially change the action or answer.
@@ -29,22 +52,9 @@ Recall proactively for continuity-sensitive situations such as:
 
 Do **not** recall for ordinary stateless questions where past user/project context cannot materially affect the answer. The memory layer should be almost invisible when irrelevant.
 
-## When to recall
+## Manual recall fallback
 
-Recall from L2 before answering or acting when the user refers to, or the current task plausibly depends on:
-
-- a previous decision or discussion;
-- an earlier project/repository/worktree state or architecture choice;
-- established preferences or constraints;
-- a lesson, failed attempt, workaround, benchmark, or reason for a prior choice;
-- context missing after session reset/clear;
-- information another agent may have learned earlier.
-
-The user does not need to explicitly request a memory lookup.
-
-## Fast path
-
-Run the local CLI from this skill directory when available:
+Use direct recall when the user explicitly asks about historical memory, when you need a deliberately narrow historical query, or when the seamless command cannot represent the required lookup:
 
 ```bash
 python3 scripts/memory_hub.py recall "<concise query>" --limit 8
@@ -62,7 +72,7 @@ python3 scripts/memory_hub.py inspect <memory-id>
 
 ## Continuity projection
 
-Do not dump recall output verbatim into context. Build the smallest useful projection for the current need.
+Do not dump recall output verbatim into context. Use the bounded projected context returned by the seamless path when available.
 
 Typical projections:
 
@@ -73,9 +83,11 @@ Typical projections:
 
 These are projections over L2, not independent sources of truth. Prefer evidence-backed current state over stale summaries.
 
+When `STALE_HEAD` appears, keep stable decisions/constraints available but revalidate volatile `project_state` against the current repository before acting.
+
 ## First use / bootstrap
 
-Do not assume L2 starts empty. On a new machine or new agent environment:
+The seamless continuity command is safe before L2 initialization and should degrade to an empty context instead of failing. For durable storage and L1 import, initialize explicitly:
 
 ```bash
 python3 scripts/memory_hub.py init
