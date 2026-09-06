@@ -21,7 +21,7 @@ class SQLiteMemoryReader:
 
     def recall(self, query: RecallQuery) -> list[MemoryCandidate]:
         terms = self._terms(query.text)
-        if not terms or not self._db_path.exists():
+        if not self._db_path.exists():
             return []
 
         resolved = self._scope_resolver.resolve(query.context)
@@ -65,37 +65,43 @@ class SQLiteMemoryReader:
             scope_rank_expr = "CASE " + " ".join(rank_case) + " ELSE 999 END"
 
             rows: list[sqlite3.Row] = []
-            try:
-                fts_exists = con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='memory_fts'").fetchone()
-                if fts_exists:
-                    match = " OR ".join('"' + t.replace('"', '') + '"' for t in terms)
-                    sql = f"""
-                        SELECT m.*, bm25(memory_fts) AS lexical_rank,
-                               {scope_rank_expr} AS scope_rank
-                        FROM memory_fts
-                        JOIN memories m ON m.id=memory_fts.id
-                        WHERE memory_fts MATCH ? AND {where}
-                        ORDER BY scope_rank ASC, lexical_rank ASC, m.confidence DESC
-                        LIMIT ?
-                    """
-                    rows = con.execute(sql, [*rank_params, match, *params, limit]).fetchall()
-            except sqlite3.OperationalError:
-                rows = []
+            if terms:
+                try:
+                    fts_exists = con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='memory_fts'").fetchone()
+                    if fts_exists:
+                        match = " OR ".join('"' + t.replace('"', '') + '"' for t in terms)
+                        sql = f"""
+                            SELECT m.*, bm25(memory_fts) AS lexical_rank,
+                                   {scope_rank_expr} AS scope_rank
+                            FROM memory_fts
+                            JOIN memories m ON m.id=memory_fts.id
+                            WHERE memory_fts MATCH ? AND {where}
+                            ORDER BY scope_rank ASC, lexical_rank ASC, m.confidence DESC
+                            LIMIT ?
+                        """
+                        rows = con.execute(sql, [*rank_params, match, *params, limit]).fetchall()
+                except sqlite3.OperationalError:
+                    rows = []
 
             if not rows:
-                likes = " OR ".join("lower(m.statement) LIKE ?" for _ in terms)
+                if terms:
+                    text_filter = "(" + " OR ".join("lower(m.statement) LIKE ?" for _ in terms) + ") AND "
+                    text_params: list[object] = [f"%{t}%" for t in terms]
+                else:
+                    text_filter = ""
+                    text_params = []
                 sql = f"""
                     SELECT m.*, 0.0 AS lexical_rank,
                            {scope_rank_expr} AS scope_rank
                     FROM memories m
-                    WHERE ({likes}) AND {where}
-                    ORDER BY scope_rank ASC, m.confidence DESC, m.updated_at DESC
+                    WHERE {text_filter}{where}
+                    ORDER BY scope_rank ASC, m.confidence DESC, m.updated_at DESC, m.id ASC
                     LIMIT ?
                 """
                 try:
                     rows = con.execute(
                         sql,
-                        [*rank_params, *[f"%{t}%" for t in terms], *params, limit],
+                        [*rank_params, *text_params, *params, limit],
                     ).fetchall()
                 except sqlite3.OperationalError:
                     return []
