@@ -152,7 +152,8 @@ A feature is complete only when applicable items are satisfied:
 
 ## Versioning
 
-The first package-development baseline is `0.2.0-alpha.1`.
+- `0.2.0-alpha.1`: package/TDD baseline and repository fingerprint primitive.
+- `0.2.0-alpha.2`: concrete Git execution-context inspector plus tested task/worktree/branch/repository/global scope precedence and isolation.
 
 `0.2.0` should not be declared stable until at least the following are integrated and regression-tested:
 
@@ -169,10 +170,10 @@ The first package-development baseline is `0.2.0-alpha.1`.
 
 ### Phase A — Seamless Core
 
-1. canonical repository identity
-2. worktree/branch/HEAD detection
-3. scope hierarchy
-4. typed + scope-aware FTS retrieval
+1. canonical repository identity — implemented
+2. worktree/branch/HEAD detection — implemented
+3. scope hierarchy — implemented at domain/application level
+4. typed + scope-aware FTS retrieval — next
 5. Continuity Gate
 6. token-budget Context Projector
 
