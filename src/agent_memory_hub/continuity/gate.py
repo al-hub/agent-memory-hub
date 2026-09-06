@@ -35,6 +35,14 @@ class ContinuityGate:
         if request.context.repository is None:
             return ContinuityDecision(ContinuityMode.NO_RECALL, "no repository context")
 
+        if request.repository_known and request.agent_changed:
+            previous = request.previous_agent or "previous-agent"
+            current = request.current_agent or "current-agent"
+            return ContinuityDecision(
+                ContinuityMode.HANDOFF,
+                f"persisted agent transition {previous}->{current}",
+            )
+
         if self._is_handoff(message):
             return ContinuityDecision(ContinuityMode.HANDOFF, "cross-agent continuity wording")
 
