@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fresh-process startup/import/composition breakdown for agent-memory-hub.
+"""Fresh-process startup/import/composition breakdown for memcarry.
 
 The measurements are diagnostic and intentionally not additive. Each fresh-process
 case launches a new Python interpreter; internal cases time one operation after the
@@ -24,7 +24,7 @@ for value in (str(BENCH_DIR), str(SRC)):
         sys.path.insert(0, value)
 
 from continuity_baseline import create_database, create_repo, summarize_ms  # noqa: E402
-from agent_memory_hub.infrastructure.sqlite.scope_index import ensure_single_index_scope_fts  # noqa: E402
+from memcarry.infrastructure.sqlite.scope_index import ensure_single_index_scope_fts  # noqa: E402
 
 
 def _python_env() -> dict[str, str]:
@@ -85,7 +85,7 @@ def collect_startup_breakdown(
     if root_parent is not None:
         root_parent.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.TemporaryDirectory(prefix="amh-startup-", dir=root_parent) as td:
+    with tempfile.TemporaryDirectory(prefix="memcarry-startup-", dir=root_parent) as td:
         base = Path(td)
         home = base / "memory"
         repo, context = create_repo(base)
@@ -97,10 +97,10 @@ def collect_startup_breakdown(
         fresh_cases = {
             "python_empty": "pass",
             "import_sqlite3": "import sqlite3",
-            "import_session_adapter": "import agent_memory_hub.cli.session_hook",
-            "import_session_continuity": "import agent_memory_hub.cli.session_continuity",
-            "import_hook_command": "import agent_memory_hub.cli.hook_command",
-            "import_continuity": "import agent_memory_hub.cli.continuity",
+            "import_session_adapter": "import memcarry.cli.session_hook",
+            "import_session_continuity": "import memcarry.cli.session_continuity",
+            "import_hook_command": "import memcarry.cli.hook_command",
+            "import_continuity": "import memcarry.cli.continuity",
         }
         fresh = {
             name: _measure(lambda c=code: _wall_ms(c, env), iterations)
@@ -113,25 +113,25 @@ def collect_startup_breakdown(
         internal_cases = {
             "build_session_start_after_import": (
                 "import time; from pathlib import Path; "
-                "from agent_memory_hub.cli.session_continuity import build_session_start_command; "
+                "from memcarry.cli.session_continuity import build_session_start_command; "
                 f"h=Path({home_literal}); t=time.perf_counter_ns(); "
                 "build_session_start_command(h); print((time.perf_counter_ns()-t)/1_000_000)"
             ),
             "build_continuity_after_import": (
                 "import time; from pathlib import Path; "
-                "from agent_memory_hub.cli.continuity import build_continuity_command; "
+                "from memcarry.cli.continuity import build_continuity_command; "
                 f"h=Path({home_literal}); t=time.perf_counter_ns(); "
                 "build_continuity_command(h); print((time.perf_counter_ns()-t)/1_000_000)"
             ),
             "git_inspect_after_import": (
-                "import time; from agent_memory_hub.infrastructure.git.repository_inspector "
+                "import time; from memcarry.infrastructure.git.repository_inspector "
                 "import GitRepositoryInspector; "
                 f"r={repo_literal}; t=time.perf_counter_ns(); "
                 "GitRepositoryInspector().inspect(r); print((time.perf_counter_ns()-t)/1_000_000)"
             ),
             "scope_index_check_after_import": (
                 "import time; from pathlib import Path; "
-                "from agent_memory_hub.infrastructure.sqlite.scope_index "
+                "from memcarry.infrastructure.sqlite.scope_index "
                 "import ensure_single_index_scope_fts; "
                 f"d=Path({db_literal}); t=time.perf_counter_ns(); "
                 "ensure_single_index_scope_fts(d); print((time.perf_counter_ns()-t)/1_000_000)"
@@ -143,7 +143,7 @@ def collect_startup_breakdown(
         }
 
         return {
-            "benchmark": "agent-memory-hub-startup-breakdown-v2",
+            "benchmark": "memcarry-startup-breakdown-v2",
             "iterations": iterations,
             "fresh_process_wall": fresh,
             "internal_after_import": internal,
@@ -162,7 +162,7 @@ def _print(report: dict) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(prog="agent-memory-hub-startup-breakdown")
+    parser = argparse.ArgumentParser(prog="memcarry-startup-breakdown")
     parser.add_argument("--iterations", type=int, default=10)
     parser.add_argument("--output")
     args = parser.parse_args()

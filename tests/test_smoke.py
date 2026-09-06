@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CLI = ROOT / "scripts" / "memory_hub.py"
+CLI = ROOT / "scripts" / "memcarry_store.py"
 
 
 class MemoryHubSmokeTest(unittest.TestCase):

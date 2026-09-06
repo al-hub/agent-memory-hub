@@ -2,7 +2,7 @@
 
 ## Development goal
 
-`agent-memory-hub` is developed as an **Agent Continuity Layer**, not merely a memory database.
+`memcarry` is developed as an **Agent Continuity Layer**, not merely a memory database.
 
 The product should be almost invisible when installed, but its absence should be obvious when a user changes agent, session, repository, branch, or worktree and must repeat prior context manually.
 
@@ -31,7 +31,7 @@ Do not start a feature by adding production branches first and tests later.
 The long-term package direction is:
 
 ```text
-src/agent_memory_hub/
+src/memcarry/
 ├── domain/          pure value objects and policy concepts
 ├── ports/           small interfaces owned by the core
 ├── application/     use cases: recall, build context, propose, resolve
@@ -212,7 +212,7 @@ A feature is complete only when applicable items are satisfied:
 
 ## Worktree-context retirement gate
 
-Do not remove `worktree-context` merely because similar concepts exist here. Deprecate it only after `agent-memory-hub` passes all of:
+Do not remove `worktree-context` merely because similar concepts exist here. Deprecate it only after `memcarry` passes all of:
 
 - known-repository automatic onboarding
 - worktree resume

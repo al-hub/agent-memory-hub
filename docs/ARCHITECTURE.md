@@ -2,7 +2,7 @@
 
 ## Goal
 
-`agent-memory-hub` is an agent-independent L2 memory layer. It does not replace each model/agent's L1 context. It bootstraps from accessible L1 sources, governs the resulting memories, and returns small context packs on demand.
+`memcarry` is an agent-independent L2 memory layer. It does not replace each model/agent's L1 context. It bootstraps from accessible L1 sources, governs the resulting memories, and returns small context packs on demand.
 
 ## Layers
 
@@ -85,7 +85,7 @@ A semantic vector/reranker path is intentionally deferred and should remain a fa
 Do not copy the entire L2 store into `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`. Future projection adapters should write only thin instructions such as:
 
 ```text
-When a task depends on prior decisions or project history, query agent-memory-hub.
+When a task depends on prior decisions or project history, query memcarry.
 Treat conflict/needs_review/stale memories as warnings and inspect provenance when needed.
 ```
 
@@ -110,7 +110,7 @@ bootstrap -> capture -> consolidate -> recall -> resolve -> project
 ## Data layout
 
 ```text
-~/.agent-memory-hub/
+~/.memcarry/
   memory.db       # materialized fast index/state
   events.jsonl    # append-only governance history
   raw/            # snapshots of imported evidence

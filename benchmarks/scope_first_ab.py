@@ -28,12 +28,12 @@ for path in (SRC, BENCHMARKS):
         sys.path.insert(0, str(path))
 
 import continuity_baseline as baseline  # noqa: E402
-from agent_memory_hub.domain.recall import RecallQuery  # noqa: E402
-from agent_memory_hub.infrastructure.sqlite.retriever import SQLiteMemoryReader  # noqa: E402
-from agent_memory_hub.infrastructure.sqlite.scope_first_retriever import (  # noqa: E402
+from memcarry.domain.recall import RecallQuery  # noqa: E402
+from memcarry.infrastructure.sqlite.retriever import SQLiteMemoryReader  # noqa: E402
+from memcarry.infrastructure.sqlite.scope_first_retriever import (  # noqa: E402
     ScopeFirstSQLiteMemoryReader,
 )
-from agent_memory_hub.infrastructure.sqlite.scope_key import scope_fts_token  # noqa: E402
+from memcarry.infrastructure.sqlite.scope_key import scope_fts_token  # noqa: E402
 
 
 def parse_sizes(raw: str) -> list[int]:
@@ -68,7 +68,7 @@ def build_scoped_fts(db_path: Path) -> float:
 def benchmark_tier(memory_count: int, *, warmup: int, iterations: int) -> dict:
     import tempfile
 
-    with tempfile.TemporaryDirectory(prefix="agent-memory-hub-scope-ab-") as td:
+    with tempfile.TemporaryDirectory(prefix="memcarry-scope-ab-") as td:
         base = Path(td)
         repo, context = baseline.create_repo(base)
         _ = repo
@@ -128,7 +128,7 @@ def main() -> int:
     args = parser.parse_args()
 
     result = {
-        "benchmark": "agent-memory-hub-scope-first-fts-ab-v1",
+        "benchmark": "memcarry-scope-first-fts-ab-v1",
         "measurement_policy": (
             "experimental A/B; broad FTS remains production control until parity and practical "
             "scale results justify adoption"

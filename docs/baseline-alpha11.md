@@ -1,6 +1,6 @@
 # v0.2.0-alpha.11 Continuity Baseline
 
-This document records the first reproducible performance baseline for the current `agent-memory-hub` architecture.
+This document records the first reproducible performance baseline for the current `memcarry` architecture.
 
 It is **not a competitive benchmark, performance promise, or release gate**. The purpose is to freeze the current level before optimizing for practical multi-agent coding workflows, so later changes can be judged against the same usage-shaped scenarios.
 

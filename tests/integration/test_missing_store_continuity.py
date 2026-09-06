@@ -2,10 +2,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agent_memory_hub.domain.context import ExecutionContext, RepositoryIdentity
-from agent_memory_hub.domain.recall import RecallQuery
-from agent_memory_hub.infrastructure.sqlite.repository_knowledge import SQLiteRepositoryKnowledgeReader
-from agent_memory_hub.infrastructure.sqlite.retriever import SQLiteMemoryReader
+from memcarry.domain.context import ExecutionContext, RepositoryIdentity
+from memcarry.domain.recall import RecallQuery
+from memcarry.infrastructure.sqlite.repository_knowledge import SQLiteRepositoryKnowledgeReader
+from memcarry.infrastructure.sqlite.retriever import SQLiteMemoryReader
 
 
 class MissingStoreContinuityTest(unittest.TestCase):

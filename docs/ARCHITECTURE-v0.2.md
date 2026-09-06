@@ -2,7 +2,7 @@
 
 ## Goal
 
-`agent-memory-hub` is an agent-independent, evidence-backed, conflict-aware L2 memory layer shared by multiple LLM agents.
+`memcarry` is an agent-independent, evidence-backed, conflict-aware L2 memory layer shared by multiple LLM agents.
 
 The system must be fast enough for normal interactive use, easy enough that users rarely think about memory management, and trustworthy enough that uncertain or conflicting memories are never silently promoted as truth.
 

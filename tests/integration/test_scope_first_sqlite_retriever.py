@@ -3,11 +3,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agent_memory_hub.domain.context import ExecutionContext, RepositoryIdentity
-from agent_memory_hub.domain.recall import RecallQuery
-from agent_memory_hub.infrastructure.sqlite.retriever import SQLiteMemoryReader
-from agent_memory_hub.infrastructure.sqlite.scope_first_retriever import ScopeFirstSQLiteMemoryReader
-from agent_memory_hub.infrastructure.sqlite.scope_key import scope_fts_token
+from memcarry.domain.context import ExecutionContext, RepositoryIdentity
+from memcarry.domain.recall import RecallQuery
+from memcarry.infrastructure.sqlite.retriever import SQLiteMemoryReader
+from memcarry.infrastructure.sqlite.scope_first_retriever import ScopeFirstSQLiteMemoryReader
+from memcarry.infrastructure.sqlite.scope_key import scope_fts_token
 
 
 class ScopeFirstSQLiteMemoryReaderTest(unittest.TestCase):

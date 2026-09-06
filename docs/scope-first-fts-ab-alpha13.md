@@ -109,7 +109,7 @@ intersect before broad lexical candidate expansion
 
 This is preferable to adding embeddings or an LLM reranker to solve a problem that deterministic repository/worktree metadata already solves.
 
-The result also strengthens the practical specialization direction of `agent-memory-hub`:
+The result also strengthens the practical specialization direction of `memcarry`:
 
 - repository/worktree/branch identity is not only correctness metadata;
 - it can be a primary performance primitive;

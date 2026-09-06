@@ -1,9 +1,9 @@
 import unittest
 
-from agent_memory_hub.application.seamless_continuity import SeamlessContinuityService
-from agent_memory_hub.domain.context import ExecutionContext, RepositoryIdentity
-from agent_memory_hub.domain.continuity import ContinuityDecision, ContinuityMode
-from agent_memory_hub.domain.continuity_state import ContinuityObservation, ContinuityState
+from memcarry.application.seamless_continuity import SeamlessContinuityService
+from memcarry.domain.context import ExecutionContext, RepositoryIdentity
+from memcarry.domain.continuity import ContinuityDecision, ContinuityMode
+from memcarry.domain.continuity_state import ContinuityObservation, ContinuityState
 
 
 class FakeDetector:

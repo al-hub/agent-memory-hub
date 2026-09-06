@@ -29,15 +29,15 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from agent_memory_hub.application.context_projector import ContextProjector  # noqa: E402
-from agent_memory_hub.cli.continuity import build_continuity_command  # noqa: E402
-from agent_memory_hub.domain.continuity import ContinuityMode  # noqa: E402
-from agent_memory_hub.domain.recall import RecallQuery  # noqa: E402
-from agent_memory_hub.infrastructure.filesystem.continuity_state_store import JsonContinuityStateStore  # noqa: E402
-from agent_memory_hub.infrastructure.git.repository_inspector import GitRepositoryInspector  # noqa: E402
-from agent_memory_hub.infrastructure.sqlite.repository_knowledge import SQLiteRepositoryKnowledgeReader  # noqa: E402
-from agent_memory_hub.infrastructure.sqlite.retriever import SQLiteMemoryReader  # noqa: E402
-from agent_memory_hub.ports.continuity_state import StoredContinuityState  # noqa: E402
+from memcarry.application.context_projector import ContextProjector  # noqa: E402
+from memcarry.cli.continuity import build_continuity_command  # noqa: E402
+from memcarry.domain.continuity import ContinuityMode  # noqa: E402
+from memcarry.domain.recall import RecallQuery  # noqa: E402
+from memcarry.infrastructure.filesystem.continuity_state_store import JsonContinuityStateStore  # noqa: E402
+from memcarry.infrastructure.git.repository_inspector import GitRepositoryInspector  # noqa: E402
+from memcarry.infrastructure.sqlite.repository_knowledge import SQLiteRepositoryKnowledgeReader  # noqa: E402
+from memcarry.infrastructure.sqlite.retriever import SQLiteMemoryReader  # noqa: E402
+from memcarry.ports.continuity_state import StoredContinuityState  # noqa: E402
 
 HOOK_SCRIPT = ROOT / "scripts" / "session_start_hook.py"
 
@@ -84,8 +84,8 @@ def create_repo(base: Path) -> tuple[Path, object]:
     repo.mkdir()
     run_git("init", "-b", "main", str(repo))
     run_git("config", "user.email", "benchmark@example.com", cwd=repo)
-    run_git("config", "user.name", "Agent Memory Hub Benchmark", cwd=repo)
-    run_git("remote", "add", "origin", "git@github.com:al-hub/agent-memory-hub-benchmark.git", cwd=repo)
+    run_git("config", "user.name", "Memcarry Benchmark", cwd=repo)
+    run_git("remote", "add", "origin", "git@github.com:al-hub/memcarry-benchmark.git", cwd=repo)
     (repo / "README.md").write_text("benchmark\n", encoding="utf-8")
     run_git("add", "README.md", cwd=repo)
     run_git("commit", "-m", "benchmark baseline", cwd=repo)
@@ -196,7 +196,7 @@ def payload_meta(rendered: str) -> dict:
 
 
 def benchmark_tier(memory_count: int, *, warmup: int, iterations: int, subprocess_iterations: int) -> dict:
-    with tempfile.TemporaryDirectory(prefix="agent-memory-hub-bench-") as td:
+    with tempfile.TemporaryDirectory(prefix="memcarry-bench-") as td:
         base = Path(td)
         home = base / "memory"
         repo, context = create_repo(base)
@@ -336,7 +336,7 @@ def benchmark_tier(memory_count: int, *, warmup: int, iterations: int, subproces
                 }
             )
             env = os.environ.copy()
-            env["AGENT_MEMORY_HUB_HOME"] = str(home)
+            env["MEMCARRY_HOME"] = str(home)
             result = subprocess.run(
                 [sys.executable, str(HOOK_SCRIPT), "--agent", agent],
                 input=payload,
@@ -395,7 +395,7 @@ def main() -> int:
 
     sizes = parse_sizes(args.sizes)
     result = {
-        "benchmark": "agent-memory-hub-continuity-baseline-v2",
+        "benchmark": "memcarry-continuity-baseline-v2",
         "measurement_policy": "reference baseline only; not a performance promise or CI gate",
         "percentiles": {
             "p50": "median: 50% of runs complete at or below this latency",

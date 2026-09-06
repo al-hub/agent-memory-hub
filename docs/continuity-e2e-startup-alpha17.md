@@ -113,13 +113,13 @@ The hook values are directionally lower than the earlier alpha.15 ~116 ms refere
 The practical machine benchmark now includes the startup breakdown in the same JSON report:
 
 ```bash
-npx --allow-git=all -y github:al-hub/agent-memory-hub benchmark --quick
+npx --allow-git=all -y github:al-hub/memcarry benchmark --quick
 ```
 
 or the full 1k / 10k / 50k / 100k run:
 
 ```bash
-npx --allow-git=all -y github:al-hub/agent-memory-hub benchmark
+npx --allow-git=all -y github:al-hub/memcarry benchmark
 ```
 
 The breakdown is diagnostic and phases are not additive.

@@ -3,9 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agent_memory_hub.infrastructure.filesystem.continuity_state_store import JsonContinuityStateStore
-from agent_memory_hub.infrastructure.sqlite.repository_knowledge import SQLiteRepositoryKnowledgeReader
-from agent_memory_hub.ports.continuity_state import StoredContinuityState
+from memcarry.infrastructure.filesystem.continuity_state_store import JsonContinuityStateStore
+from memcarry.infrastructure.sqlite.repository_knowledge import SQLiteRepositoryKnowledgeReader
+from memcarry.ports.continuity_state import StoredContinuityState
 
 
 class ContinuityStateAdaptersTest(unittest.TestCase):

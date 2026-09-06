@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from agent_memory_hub.cli.session_hook import AgentKind, SessionHookAdapter
+from memcarry.cli.session_hook import AgentKind, SessionHookAdapter
 
 
 class SessionHookAdapterTest(unittest.TestCase):

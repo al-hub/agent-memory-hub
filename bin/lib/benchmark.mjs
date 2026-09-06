@@ -10,7 +10,7 @@ export function resolveBenchmarkConfig(raw = {}, cwd = process.cwd()) {
     warmup: raw.warmup ?? (quick ? 1 : 5),
     iterations: raw.iterations ?? (quick ? 5 : 30),
     subprocessIterations: raw.subprocessIterations ?? (quick ? 3 : 10),
-    output: path.resolve(cwd, raw.output ?? 'agent-memory-hub-benchmark.json'),
+    output: path.resolve(cwd, raw.output ?? 'memcarry-benchmark.json'),
   };
 }
 
@@ -51,7 +51,7 @@ export function runBenchmark({ packageRoot, memoryHome, rawOptions = {}, cwd = p
   const python = findPython();
   fs.mkdirSync(path.dirname(config.output), { recursive: true });
 
-  console.log('agent-memory-hub: practical machine benchmark');
+  console.log('memcarry: practical machine benchmark');
   console.log(`mode: ${rawOptions.quick ? 'quick' : 'full'}`);
   console.log(`tiers: ${config.sizes}`);
   console.log(`python: ${python}`);
@@ -62,9 +62,9 @@ export function runBenchmark({ packageRoot, memoryHome, rawOptions = {}, cwd = p
     cwd,
     env: {
       ...process.env,
-      AGENT_MEMORY_HUB_HOME: memoryHome,
-      AGENT_MEMORY_HUB_BENCHMARK_NODE: process.version,
-      AGENT_MEMORY_HUB_BENCHMARK_HOST: os.hostname(),
+      MEMCARRY_HOME: memoryHome,
+      MEMCARRY_BENCHMARK_NODE: process.version,
+      MEMCARRY_BENCHMARK_HOST: os.hostname(),
     },
     stdio: 'inherit',
   });

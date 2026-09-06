@@ -2,29 +2,29 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agent_memory_hub.continuity.fingerprint import canonical_repository_id, normalize_git_remote
+from memcarry.continuity.fingerprint import canonical_repository_id, normalize_git_remote
 
 
 class RepositoryFingerprintTest(unittest.TestCase):
     def test_https_and_ssh_remotes_normalize_to_same_repository(self):
         self.assertEqual(
-            normalize_git_remote("https://github.com/al-hub/agent-memory-hub.git"),
-            normalize_git_remote("git@github.com:al-hub/agent-memory-hub.git"),
+            normalize_git_remote("https://github.com/al-hub/memcarry.git"),
+            normalize_git_remote("git@github.com:al-hub/memcarry.git"),
         )
         self.assertEqual(
-            normalize_git_remote("https://github.com/al-hub/agent-memory-hub.git"),
-            "github.com/al-hub/agent-memory-hub",
+            normalize_git_remote("https://github.com/al-hub/memcarry.git"),
+            "github.com/al-hub/memcarry",
         )
 
     def test_ssh_url_normalizes(self):
         self.assertEqual(
-            normalize_git_remote("ssh://git@github.com/al-hub/agent-memory-hub.git"),
-            "github.com/al-hub/agent-memory-hub",
+            normalize_git_remote("ssh://git@github.com/al-hub/memcarry.git"),
+            "github.com/al-hub/memcarry",
         )
 
     def test_same_remote_is_stable_across_worktrees(self):
-        a = canonical_repository_id(remote="git@github.com:al-hub/agent-memory-hub.git", common_dir="/tmp/repo/.git")
-        b = canonical_repository_id(remote="https://github.com/al-hub/agent-memory-hub", common_dir="/tmp/other-worktree/.git")
+        a = canonical_repository_id(remote="git@github.com:al-hub/memcarry.git", common_dir="/tmp/repo/.git")
+        b = canonical_repository_id(remote="https://github.com/al-hub/memcarry", common_dir="/tmp/other-worktree/.git")
         self.assertEqual(a, b)
 
     def test_local_repository_without_remote_uses_stable_common_dir_identity(self):

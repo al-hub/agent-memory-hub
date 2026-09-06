@@ -19,7 +19,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Syntax check
         run: |
-          python -m py_compile scripts/memory_hub.py
+          python -m py_compile scripts/memcarry_store.py
           python -m py_compile benchmarks/continuity_baseline.py
           python -m py_compile benchmarks/machine_benchmark.py
           python -m py_compile benchmarks/startup_breakdown.py
@@ -41,7 +41,7 @@ jobs:
           python-version: "3.12"
       - name: NPM package checks
         run: |
-          node --check bin/agent-memory-hub.mjs
+          node --check bin/memcarry.mjs
           node --check bin/lib/installer.mjs
           npm test
 

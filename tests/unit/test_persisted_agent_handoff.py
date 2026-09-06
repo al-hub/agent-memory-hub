@@ -1,11 +1,11 @@
 import unittest
 
-from agent_memory_hub.application.continuity_state_detector import ContinuityStateDetector
-from agent_memory_hub.continuity.gate import ContinuityGate
-from agent_memory_hub.domain.context import ExecutionContext, RepositoryIdentity
-from agent_memory_hub.domain.continuity import ContinuityMode
-from agent_memory_hub.domain.continuity_state import ContinuityObservation
-from agent_memory_hub.ports.continuity_state import StoredContinuityState
+from memcarry.application.continuity_state_detector import ContinuityStateDetector
+from memcarry.continuity.gate import ContinuityGate
+from memcarry.domain.context import ExecutionContext, RepositoryIdentity
+from memcarry.domain.continuity import ContinuityMode
+from memcarry.domain.continuity_state import ContinuityObservation
+from memcarry.ports.continuity_state import StoredContinuityState
 
 
 class FakeKnowledgeReader:

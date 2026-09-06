@@ -97,7 +97,7 @@ FTS rowids are aligned to `memories.rowid`.
 
 ## Legacy writer synchronization
 
-The compatibility `scripts/memory_hub.py` writer can still insert only `(id, statement)` into the FTS table. To avoid a correctness gap, migration installs a tiny `scope_fts_dirty` table and triggers on `memories` insert/update/delete.
+The compatibility `scripts/memcarry_store.py` writer can still insert only `(id, statement)` into the FTS table. To avoid a correctness gap, migration installs a tiny `scope_fts_dirty` table and triggers on `memories` insert/update/delete.
 
 ```text
 legacy write

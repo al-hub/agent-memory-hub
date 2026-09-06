@@ -26,13 +26,13 @@ for path in (SRC, BENCHMARKS):
         sys.path.insert(0, str(path))
 
 import continuity_baseline as baseline  # noqa: E402
-from agent_memory_hub.domain.recall import RecallQuery  # noqa: E402
-from agent_memory_hub.infrastructure.sqlite.retriever import SQLiteMemoryReader  # noqa: E402
-from agent_memory_hub.infrastructure.sqlite.scope_first_retriever import (  # noqa: E402
+from memcarry.domain.recall import RecallQuery  # noqa: E402
+from memcarry.infrastructure.sqlite.retriever import SQLiteMemoryReader  # noqa: E402
+from memcarry.infrastructure.sqlite.scope_first_retriever import (  # noqa: E402
     ScopeFirstSQLiteMemoryReader,
 )
-from agent_memory_hub.infrastructure.sqlite.scope_key import scope_fts_token  # noqa: E402
-from agent_memory_hub.infrastructure.sqlite.single_index_scope_retriever import (  # noqa: E402
+from memcarry.infrastructure.sqlite.scope_key import scope_fts_token  # noqa: E402
+from memcarry.infrastructure.sqlite.single_index_scope_retriever import (  # noqa: E402
     SingleIndexScopeSQLiteMemoryReader,
 )
 
@@ -110,7 +110,7 @@ def _speedup(control: dict, candidate: dict, percentile_name: str) -> float:
 
 
 def benchmark_tier(memory_count: int, *, warmup: int, iterations: int) -> dict:
-    with tempfile.TemporaryDirectory(prefix="agent-memory-hub-scope-3way-") as td:
+    with tempfile.TemporaryDirectory(prefix="memcarry-scope-3way-") as td:
         base = Path(td)
         _repo, context = baseline.create_repo(base)
 
@@ -184,7 +184,7 @@ def main() -> int:
     args = parser.parse_args()
 
     result = {
-        "benchmark": "agent-memory-hub-scope-first-fts-three-way-v1",
+        "benchmark": "memcarry-scope-first-fts-three-way-v1",
         "measurement_policy": (
             "experimental three-way comparison; production remains broad until single-index "
             "parity, storage, migration, and write synchronization are validated"

@@ -161,8 +161,8 @@ Scope is intentionally extensible.
 ```json
 {
   "level": "project",
-  "project": "agent-memory-hub",
-  "repository": "al-hub/agent-memory-hub",
+  "project": "memcarry",
+  "repository": "al-hub/memcarry",
   "task": null,
   "agent": null,
   "topic": "memory architecture"

@@ -11,11 +11,11 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from agent_memory_hub.application.scope_resolver import ScopeResolver
-from agent_memory_hub.application.scope_storage import scope_storage_ref
-from agent_memory_hub.cli.continuity import build_continuity_command
-from agent_memory_hub.domain.context import ScopeLevel
-from agent_memory_hub.infrastructure.git.repository_inspector import GitRepositoryInspector
+from memcarry.application.scope_resolver import ScopeResolver
+from memcarry.application.scope_storage import scope_storage_ref
+from memcarry.cli.continuity import build_continuity_command
+from memcarry.domain.context import ScopeLevel
+from memcarry.infrastructure.git.repository_inspector import GitRepositoryInspector
 
 
 def run_git(*args: str, cwd: Path | None = None) -> str:

@@ -1,10 +1,10 @@
 {
-  "name": "@al-hub/agent-memory-hub",
-  "version": "0.2.0-alpha.17",
+  "name": "@al-hub/memcarry",
+  "version": "0.2.0-alpha.18",
   "description": "Local-first shared L2 memory and continuity layer for AI coding agents",
   "type": "module",
   "bin": {
-    "agent-memory-hub": "bin/agent-memory-hub.mjs"
+    "memcarry": "bin/memcarry.mjs"
   },
   "files": [
     "bin/",
@@ -13,6 +13,7 @@
     "benchmarks/",
     "SKILL.md",
     "README.md",
+    "docs/",
     "pyproject.toml"
   ],
   "scripts": {
@@ -24,6 +25,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/al-hub/agent-memory-hub.git"
+    "url": "git+https://github.com/al-hub/memcarry.git"
   }
 }

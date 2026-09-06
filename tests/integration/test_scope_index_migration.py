@@ -3,8 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agent_memory_hub.infrastructure.sqlite.scope_index import ensure_single_index_scope_fts
-from agent_memory_hub.infrastructure.sqlite.scope_key import scope_fts_token
+from memcarry.infrastructure.sqlite.scope_index import ensure_single_index_scope_fts
+from memcarry.infrastructure.sqlite.scope_key import scope_fts_token
 
 
 class ScopeIndexMigrationTest(unittest.TestCase):

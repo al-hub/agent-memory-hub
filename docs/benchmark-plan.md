@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The benchmark suite should test whether `agent-memory-hub` is not only persistent, but useful, fast, and trustworthy across agents and long-running sessions.
+The benchmark suite should test whether `memcarry` is not only persistent, but useful, fast, and trustworthy across agents and long-running sessions.
 
 The plan borrows practical evaluation dimensions from long-term memory research while adding governance-specific tests that matter for this project.
 

@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agent_memory_hub.infrastructure.git.repository_inspector import GitRepositoryInspector
+from memcarry.infrastructure.git.repository_inspector import GitRepositoryInspector
 
 
 ROOT = Path(__file__).resolve().parents[2]

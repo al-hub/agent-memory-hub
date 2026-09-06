@@ -1,10 +1,10 @@
 import unittest
 
-from agent_memory_hub.application.continuity_recall import ContinuityRecallService
-from agent_memory_hub.continuity.gate import ContinuityGate
-from agent_memory_hub.domain.context import ExecutionContext, RepositoryIdentity
-from agent_memory_hub.domain.continuity import ContinuityMode, ContinuityRequest
-from agent_memory_hub.domain.recall import MemoryCandidate
+from memcarry.application.continuity_recall import ContinuityRecallService
+from memcarry.continuity.gate import ContinuityGate
+from memcarry.domain.context import ExecutionContext, RepositoryIdentity
+from memcarry.domain.continuity import ContinuityMode, ContinuityRequest
+from memcarry.domain.recall import MemoryCandidate
 
 
 class FakeMemoryReader:

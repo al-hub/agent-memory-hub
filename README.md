@@ -1,41 +1,48 @@
-# agent-memory-hub
+# Memcarry
 
-**One trusted memory for every AI agent.**
+**AI가 바뀌어도, 작업은 이어진다.**
 
-Current development baseline: **v0.2.0-alpha.17**
+Current development baseline: **v0.2.0-alpha.18**
 
-`agent-memory-hub` is a local-first shared L2 memory and continuity layer for AI coding agents. It is specialized for practical coding workflows: fast resume, repository/worktree/HEAD correctness, bounded context, persisted cross-agent handoff, and minimal manual memory commands.
+[실전 사용 시나리오](docs/USAGE-SCENARIOS.md) · [기존 설치 전환](docs/MIGRATION-MEMCARRY.md) · [변경 전후 검증](docs/REBRAND-VALIDATION.md)
+
+`memcarry` is a local-first shared L2 memory and continuity layer for AI coding agents. It is specialized for practical coding workflows: fast resume, repository/worktree/HEAD correctness, bounded context, persisted cross-agent handoff, and minimal manual memory commands.
 
 Raw evidence is canonical. Governed memories and summaries are rebuildable indexes/projections over that evidence.
+
+Memcarry means **Memory + Carry**: keep useful decisions, evidence, and progress, then carry relevant context into the next task.
+It is the renamed `al-hub/agent-memory-hub`, not the separately maintained `liuyang0508/Agent-Memory-Hub` or its unscoped npm package.
 
 ## One-command install
 
 Until the scoped npm package is published, npm 12+ must explicitly opt in to Git-backed package fetching for that command:
 
 ```bash
-npx --allow-git=all -y github:al-hub/agent-memory-hub install
+npx --allow-git=all -y github:al-hub/memcarry install
 ```
 
 Selected agents only:
 
 ```bash
-npx --allow-git=all -y github:al-hub/agent-memory-hub install --agents codex,claude
+npx --allow-git=all -y github:al-hub/memcarry install --agents codex,claude
 ```
 
 Status / uninstall:
 
 ```bash
-npx --allow-git=all -y github:al-hub/agent-memory-hub status
-npx --allow-git=all -y github:al-hub/agent-memory-hub uninstall
+npx --allow-git=all -y github:al-hub/memcarry status
+npx --allow-git=all -y github:al-hub/memcarry uninstall
 ```
 
 After npm publication the intended form is:
 
 ```bash
-npx -y @al-hub/agent-memory-hub@latest install
+npx -y @al-hub/memcarry@latest install
 ```
 
-The installer copies a stable runtime to `~/.agent-memory-hub/runtime`, initializes the local store, and merges SessionStart hooks for Codex / Claude / Gemini without replacing unrelated settings. Memory data survives runtime upgrades/uninstall.
+The installer copies a stable runtime to `~/.memcarry/runtime`, initializes the local store, and configures Codex / Claude / Gemini SessionStart hooks plus an Antigravity CLI (`agy`) plugin without replacing unrelated settings. Memory data survives runtime upgrades/uninstall.
+
+Existing al-hub users: explicitly reuse your old store with `install --home "$HOME/.agent-memory-hub"`; see the migration guide before removing an old skill. No legacy data is silently moved or merged.
 
 ## Target experience
 
@@ -62,6 +69,9 @@ Claude receives bounded governed L2 context
 
 No separate handoff database is introduced; governed L2 memory remains the durable source.
 
+Explicit requests such as “memcarry에 결정과 이유를 남겨줘” are supported through the skill's durable-write instructions.
+They are not magic parser keywords: the agent must execute a write and confirm it. SessionStart saves continuity observations, not every conversation or task update.
+
 Continuity modes:
 
 ```text
@@ -81,19 +91,15 @@ Repository-local refs are repository-qualified. If HEAD changes, volatile `proje
 Installed hooks run:
 
 ```text
-python3 ~/.agent-memory-hub/runtime/scripts/session_start_hook.py --agent <agent>
+python3 ~/.memcarry/runtime/scripts/session_start_hook.py --agent <agent>
 ```
 
-SessionStart behavior:
+AGY uses its native plugin hook format at `~/.gemini/antigravity-cli/plugins/memcarry/` and injects bounded context on the first `PreInvocation`.
 
-```text
-startup  → ONBOARDING when prior repository memory exists
-resume   → RESUME
-clear    → RESUME even if session id is unchanged
-compact  → RESUME where supported
-fork     → RESUME where supported
-agent change in known repo/worktree → HANDOFF
-```
+Modes depend on repository knowledge, checkpoint compatibility, agent identity, and lifecycle payload.
+Known-repository startup can onboard; reset/resume can resume; agent changes can hand off.
+Client support determines which events actually invoke SessionStart. A configured hook is not proof that a client executed or consumed it.
+Compatible fresh clones resume when repository ID and HEAD/branch match; linked worktrees do not use that fallback.
 
 Hooks are fail-open: memory failure must never block the coding agent itself.
 
@@ -125,13 +131,13 @@ A legacy two-column FTS is non-destructively rebuilt from canonical `memories`. 
 Run the packaged benchmark without cloning:
 
 ```bash
-npx --allow-git=all -y github:al-hub/agent-memory-hub benchmark --quick
+npx --allow-git=all -y github:al-hub/memcarry benchmark --quick
 ```
 
 Full 1k / 10k / 50k / 100k run:
 
 ```bash
-npx --allow-git=all -y github:al-hub/agent-memory-hub benchmark
+npx --allow-git=all -y github:al-hub/memcarry benchmark
 ```
 
 It records:
@@ -144,7 +150,7 @@ It records:
 - startup/import/composition phase breakdown;
 - p50 / p95 and a JSON report.
 
-Default report: `./agent-memory-hub-benchmark.json`.
+Default report: `./memcarry-benchmark.json`.
 
 Synthetic fixtures are temporary and do not populate the real memory DB. `fresh-process` means a new Python interpreter per request; it does not flush the OS page cache.
 
@@ -224,7 +230,7 @@ Conflicts are surfaced rather than silently overwritten. Suspicious/noisy conten
 Default local data directory:
 
 ```text
-~/.agent-memory-hub/
+~/.memcarry/
   memory.db
   events.jsonl
   continuity-state.json
@@ -232,9 +238,9 @@ Default local data directory:
   runtime/
 ```
 
-Compatibility storage/governance commands remain available in `scripts/memory_hub.py`.
+Compatibility storage/governance commands remain available in `scripts/memcarry_store.py`.
 
-## v0.2.0-alpha.17 status
+## v0.2.0-alpha.18 status
 
 Implemented and tested:
 
@@ -250,6 +256,9 @@ Implemented and tested:
 - fresh-process startup/import/composition breakdown;
 - Python 3.10 / 3.12 / 3.13 and Node CI;
 - ordered-result parity / scale benchmark artifacts.
+- compatible fresh-clone Resume, distinct from linked worktrees;
+- Memcarry product/skill/package/module naming and explicit legacy store compatibility;
+- custom-home hook execution and mixed-group hook preservation regression tests.
 
 ## Performance records
 
@@ -264,12 +273,12 @@ Implemented and tested:
 
 Development remains driven by practical usage:
 
-1. use alpha.17 in normal Codex / Claude / Gemini workflows and collect real handoff failures rather than inventing more memory features;
+1. use alpha.18 in normal Codex / Claude / Gemini workflows and collect real handoff failures rather than inventing more memory features;
 2. add meaningful-event capture only after durable-write policy is proven against real usage;
 3. optimize SessionStart further only if repeated WSL startup breakdowns show a stable, actionable target;
 4. add semantic fallback/MCP only where measured workflows justify them.
 
-`worktree-context` migration/archive work is intentionally outside the current `agent-memory-hub` plan.
+`worktree-context` migration/archive work is intentionally outside the current `memcarry` plan.
 
 ## Safety / privacy
 

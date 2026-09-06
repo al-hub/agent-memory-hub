@@ -1,10 +1,10 @@
 import unittest
 
-from agent_memory_hub.application.continuity_context import ContinuityContextService
-from agent_memory_hub.domain.context import ExecutionContext, RepositoryIdentity
-from agent_memory_hub.domain.continuity import ContinuityDecision, ContinuityMode, ContinuityRequest
-from agent_memory_hub.domain.projection import ContextPack
-from agent_memory_hub.domain.recall import MemoryCandidate
+from memcarry.application.continuity_context import ContinuityContextService
+from memcarry.domain.context import ExecutionContext, RepositoryIdentity
+from memcarry.domain.continuity import ContinuityDecision, ContinuityMode, ContinuityRequest
+from memcarry.domain.projection import ContextPack
+from memcarry.domain.recall import MemoryCandidate
 
 
 class FakeGate:

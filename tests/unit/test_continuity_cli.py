@@ -1,13 +1,13 @@
 import json
 import unittest
 
-from agent_memory_hub.cli.continuity import ContinuityCommand
-from agent_memory_hub.domain.context import ExecutionContext, RepositoryIdentity
-from agent_memory_hub.domain.continuity import ContinuityDecision, ContinuityMode
-from agent_memory_hub.domain.continuity_state import ContinuityState
-from agent_memory_hub.domain.projection import ContextItem, ContextPack
-from agent_memory_hub.application.continuity_context import ContinuityContextResult
-from agent_memory_hub.application.seamless_continuity import SeamlessContinuityResult
+from memcarry.cli.continuity import ContinuityCommand
+from memcarry.domain.context import ExecutionContext, RepositoryIdentity
+from memcarry.domain.continuity import ContinuityDecision, ContinuityMode
+from memcarry.domain.continuity_state import ContinuityState
+from memcarry.domain.projection import ContextItem, ContextPack
+from memcarry.application.continuity_context import ContinuityContextResult
+from memcarry.application.seamless_continuity import SeamlessContinuityResult
 
 
 class FakeInspector:

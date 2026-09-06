@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Practical local-machine benchmark for agent-memory-hub.
+"""Practical local-machine benchmark for memcarry.
 
 This wrapper reuses the repository's continuity baseline and adds:
 - WSL / CPU / RAM / filesystem / toolchain metadata
@@ -40,8 +40,8 @@ from continuity_baseline import (  # noqa: E402
     summarize_ms,
 )
 from startup_breakdown import collect_startup_breakdown  # noqa: E402
-from agent_memory_hub.infrastructure.filesystem.continuity_state_store import JsonContinuityStateStore  # noqa: E402
-from agent_memory_hub.ports.continuity_state import StoredContinuityState  # noqa: E402
+from memcarry.infrastructure.filesystem.continuity_state_store import JsonContinuityStateStore  # noqa: E402
+from memcarry.ports.continuity_state import StoredContinuityState  # noqa: E402
 
 CONTINUITY_SCRIPT = ROOT / "scripts" / "continuity_context.py"
 
@@ -146,7 +146,7 @@ def sqlite_fts5_available() -> bool:
 def environment_info(memory_home: Path) -> dict:
     return {
         "python": platform.python_version(),
-        "node": os.environ.get("AGENT_MEMORY_HUB_BENCHMARK_NODE") or command_output("node", "--version"),
+        "node": os.environ.get("MEMCARRY_BENCHMARK_NODE") or command_output("node", "--version"),
         "npx": command_output("npx", "--version"),
         "git": command_output("git", "--version"),
         "sqlite": sqlite3.sqlite_version,
@@ -291,7 +291,7 @@ def print_summary(report: dict, output: Path) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(prog="agent-memory-hub-machine-benchmark")
+    parser = argparse.ArgumentParser(prog="memcarry-machine-benchmark")
     parser.add_argument("--sizes", default="1000,10000,50000,100000")
     parser.add_argument("--warmup", type=int, default=5)
     parser.add_argument("--iterations", type=int, default=30)
@@ -302,7 +302,7 @@ def main() -> int:
     sizes = parse_sizes(args.sizes)
     output = Path(args.output).expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
-    memory_home = Path(os.environ.get("AGENT_MEMORY_HUB_HOME", Path.home() / ".agent-memory-hub")).expanduser()
+    memory_home = Path(os.environ.get("MEMCARRY_HOME", Path.home() / ".memcarry")).expanduser()
     fixture_root = memory_home / "benchmark-fixtures"
 
     env = environment_info(memory_home)
@@ -313,7 +313,7 @@ def main() -> int:
     )
 
     result = {
-        "benchmark": "agent-memory-hub-practical-machine-v2",
+        "benchmark": "memcarry-practical-machine-v2",
         "measurement_policy": "reference baseline only; not a latency promise or hard performance gate",
         "definitions": {
             "warm": "in-process continuity after configured warmups",

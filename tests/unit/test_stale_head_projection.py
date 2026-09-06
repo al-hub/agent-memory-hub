@@ -1,8 +1,8 @@
 import unittest
 
-from agent_memory_hub.application.context_projector import ContextProjector
-from agent_memory_hub.domain.continuity import ContinuityMode
-from agent_memory_hub.domain.recall import MemoryCandidate
+from memcarry.application.context_projector import ContextProjector
+from memcarry.domain.continuity import ContinuityMode
+from memcarry.domain.recall import MemoryCandidate
 
 
 def mem(mid, statement, memory_type, *, scope_rank=3):

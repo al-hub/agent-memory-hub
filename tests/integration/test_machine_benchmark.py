@@ -30,7 +30,7 @@ class MachineBenchmarkIntegrationTest(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, msg=result.stderr or result.stdout)
             report = json.loads(output.read_text(encoding="utf-8"))
-            self.assertEqual(report["benchmark"], "agent-memory-hub-practical-machine-v2")
+            self.assertEqual(report["benchmark"], "memcarry-practical-machine-v2")
             self.assertIn("wsl", report["environment"])
             self.assertIn("filesystem", report["environment"])
             self.assertIn("startup_breakdown", report)

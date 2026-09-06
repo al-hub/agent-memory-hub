@@ -13,7 +13,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from agent_memory_hub.infrastructure.git.repository_inspector import GitRepositoryInspector
+from memcarry.infrastructure.git.repository_inspector import GitRepositoryInspector
 
 
 def run_git(*args: str, cwd: Path | None = None) -> str:
@@ -83,7 +83,7 @@ class CrossAgentHandoffE2E(unittest.TestCase):
             "source": "startup",
         }
         env = os.environ.copy()
-        env["AGENT_MEMORY_HUB_HOME"] = str(self.home)
+        env["MEMCARRY_HOME"] = str(self.home)
         result = subprocess.run(
             [sys.executable, str(HOOK), "--agent", agent],
             input=json.dumps(payload),

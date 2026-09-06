@@ -1,7 +1,7 @@
 import unittest
 
-from agent_memory_hub.domain.context import ResolvedScope, ScopeLevel
-from agent_memory_hub.application.scope_storage import scope_storage_ref
+from memcarry.domain.context import ResolvedScope, ScopeLevel
+from memcarry.application.scope_storage import scope_storage_ref
 
 
 class ScopeStorageTest(unittest.TestCase):

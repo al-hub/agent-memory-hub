@@ -13,7 +13,7 @@ test('full benchmark defaults to practical 1k through 100k tiers', () => {
   assert.equal(config.warmup, 5);
   assert.equal(config.iterations, 30);
   assert.equal(config.subprocessIterations, 10);
-  assert.equal(config.output, path.resolve('/tmp/work', 'agent-memory-hub-benchmark.json'));
+  assert.equal(config.output, path.resolve('/tmp/work', 'memcarry-benchmark.json'));
 });
 
 test('quick benchmark stays useful while reducing local repetitions', () => {

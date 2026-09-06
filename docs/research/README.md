@@ -1,6 +1,6 @@
-# Research Notes for agent-memory-hub
+# Research Notes for memcarry
 
-This directory records research that directly informs the design of `agent-memory-hub`. It is intentionally implementation-oriented: each paper is mapped to a design decision, a risk, or a benchmark requirement.
+This directory records research that directly informs the design of `memcarry`. It is intentionally implementation-oriented: each paper is mapped to a design decision, a risk, or a benchmark requirement.
 
 Last reviewed: 2026-09-06
 
@@ -30,7 +30,7 @@ Last reviewed: 2026-09-06
 
 The benchmark separates long-term memory into five abilities: information extraction, multi-session reasoning, temporal reasoning, knowledge updates, and abstention. The authors also report useful design techniques such as session decomposition, fact-augmented indexing, and time-aware query expansion.
 
-**For agent-memory-hub:**
+**For memcarry:**
 
 - Make these five abilities first-class benchmark categories.
 - Preserve session identity and timestamps during L1 bootstrap.
@@ -42,7 +42,7 @@ The benchmark separates long-term memory into five abilities: information extrac
 
 **Problem:** Full-history prompting is expensive and slow. Mem0 instead extracts, consolidates, and retrieves salient memories; its evaluation also studies graph memory and practical latency/token costs.
 
-**For agent-memory-hub:**
+**For memcarry:**
 
 - Keep compact context packs as the normal output.
 - Avoid loading the complete RAW archive into an agent context.
@@ -54,7 +54,7 @@ The benchmark separates long-term memory into five abilities: information extrac
 
 **Problem:** Flat stores do not capture how memories become related or how their contextual interpretation changes. A-MEM uses a Zettelkasten-inspired organization with structured attributes, links, and evolving representations.
 
-**For agent-memory-hub:**
+**For memcarry:**
 
 - Keep `relations` as a first-class structure (`supports`, `conflicts_with`, `supersedes`, `related_to`, etc.).
 - Allow derived memory representations to evolve while keeping RAW evidence immutable.
@@ -65,7 +65,7 @@ The benchmark separates long-term memory into five abilities: information extrac
 
 **Problem:** The model context window is a scarce fast-memory tier. MemGPT introduces virtual context management inspired by operating-system memory hierarchies.
 
-**For agent-memory-hub:**
+**For memcarry:**
 
 - Formalize agent-native context/memory as **L1** and the shared durable hub as **L2**.
 - Initial setup should bootstrap accessible L1 into L2 rather than start empty.
@@ -77,7 +77,7 @@ The benchmark separates long-term memory into five abilities: information extrac
 
 **Problem:** Semantically similar memories can have different functional roles. Mixing stable facts, episodic events, and behavioral rules in one undifferentiated retrieval pool can contaminate reasoning. MemGuard addresses this with type-aware memory construction and retrieval.
 
-**For agent-memory-hub:**
+**For memcarry:**
 
 - Keep explicit memory types such as `identity`, `preference`, `decision`, `constraint`, `project_state`, `episode`, `lesson`, `fact`, and `procedure`.
 - Type/scope filtering belongs before broad retrieval.
@@ -89,7 +89,7 @@ The benchmark separates long-term memory into five abilities: information extrac
 
 **Problem:** Long-term and short-term memory management can be represented as actions the agent learns or chooses: storing, retrieving, updating, summarizing, and discarding.
 
-**For agent-memory-hub:**
+**For memcarry:**
 
 Use a small stable operation vocabulary:
 
@@ -168,4 +168,4 @@ See `../benchmark-plan.md` for the project-specific benchmark plan.
 
 ## Research guardrails
 
-These papers are design evidence, not specifications. Reported benchmark gains are specific to their experimental setups and should not be copied as expected project performance. `agent-memory-hub` should validate each added mechanism against its own benchmark before accepting the added complexity.
+These papers are design evidence, not specifications. Reported benchmark gains are specific to their experimental setups and should not be copied as expected project performance. `memcarry` should validate each added mechanism against its own benchmark before accepting the added complexity.

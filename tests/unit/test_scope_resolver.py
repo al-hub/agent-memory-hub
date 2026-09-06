@@ -1,7 +1,7 @@
 import unittest
 
-from agent_memory_hub.application.scope_resolver import ScopeResolver
-from agent_memory_hub.domain.context import ExecutionContext, RepositoryIdentity, ScopeLevel
+from memcarry.application.scope_resolver import ScopeResolver
+from memcarry.domain.context import ExecutionContext, RepositoryIdentity, ScopeLevel
 
 
 class ScopeResolverTest(unittest.TestCase):

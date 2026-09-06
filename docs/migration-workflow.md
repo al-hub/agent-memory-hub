@@ -7,8 +7,8 @@ A fresh installation must become useful immediately by discovering and indexing 
 ## User experience target
 
 ```bash
-npx skills@latest add al-hub/agent-memory-hub -g
-agent-memory-hub init
+npx skills@latest add al-hub/memcarry -g
+memcarry init
 ```
 
 Expected flow:
@@ -142,7 +142,7 @@ Example projection:
 
 ```md
 ## Shared Memory
-Use agent-memory-hub when prior decisions, preferences, lessons, or project state may affect the current task.
+Use memcarry when prior decisions, preferences, lessons, or project state may affect the current task.
 Prefer active/verified memories. Surface conflicts and needs-review entries instead of assuming they are true.
 Inspect evidence for important decisions.
 ```
@@ -232,14 +232,14 @@ Rerunning `bootstrap` skips unchanged completed sources.
 ## Commands proposed for v0.2
 
 ```text
-agent-memory-hub init
-agent-memory-hub bootstrap [--dry-run] [--agent ...]
-agent-memory-hub bootstrap --resume
-agent-memory-hub sources
-agent-memory-hub recall "..."
-agent-memory-hub consolidate [scope] [--budget ...]
-agent-memory-hub project-l1 [agent]
-agent-memory-hub doctor
+memcarry init
+memcarry bootstrap [--dry-run] [--agent ...]
+memcarry bootstrap --resume
+memcarry sources
+memcarry recall "..."
+memcarry consolidate [scope] [--budget ...]
+memcarry project-l1 [agent]
+memcarry doctor
 ```
 
 ## Performance principle
