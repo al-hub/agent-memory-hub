@@ -28,4 +28,5 @@ class ContinuityState:
             repository_known=self.repository_known,
             session_has_context=self.session_has_context,
             session_reset=self.session_reset,
+            stale_head=self.stale_head,
         )
