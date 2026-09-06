@@ -42,14 +42,14 @@ class SessionStartHookScriptTest(unittest.TestCase):
           scope_ref TEXT,
           updated_at INTEGER NOT NULL
         );
+        CREATE VIRTUAL TABLE memory_fts USING fts5(id UNINDEXED, statement);
         """)
-        con.executemany(
-            "INSERT INTO memories VALUES(?,?,?,?,?,?,?,?,?)",
-            [
-                ("d1", "Use FTS5 before semantic fallback", "decision", "active", "verified", .98, "repository", repo_id, 1),
-                ("p1", "Continue wiring agent session hooks", "project_state", "active", "verified", .95, "repository", repo_id, 2),
-            ],
-        )
+        rows = [
+            ("d1", "Use FTS5 before semantic fallback", "decision", "active", "verified", .98, "repository", repo_id, 1),
+            ("p1", "Continue wiring agent session hooks", "project_state", "active", "verified", .95, "repository", repo_id, 2),
+        ]
+        con.executemany("INSERT INTO memories VALUES(?,?,?,?,?,?,?,?,?)", rows)
+        con.executemany("INSERT INTO memory_fts(id,statement) VALUES(?,?)", [(r[0], r[1]) for r in rows])
         con.commit()
         con.close()
         return repo, home
@@ -77,6 +77,12 @@ class SessionStartHookScriptTest(unittest.TestCase):
             self.assertEqual(specific["hookEventName"], "SessionStart")
             self.assertIn("additionalContext", specific)
             self.assertIn("Use FTS5 before semantic fallback", specific["additionalContext"])
+
+            # SessionStart has no lexical query, so it must not pay for or mutate
+            # the prompt-only scope-first FTS migration path.
+            with sqlite3.connect(home / "memory.db") as con:
+                columns = [row[1] for row in con.execute("PRAGMA table_info(memory_fts)")]
+            self.assertEqual(columns, ["id", "statement"])
             return specific["additionalContext"]
 
     def test_codex_resume_injects_scoped_context(self):
