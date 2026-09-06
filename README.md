@@ -2,39 +2,15 @@
 
 **One trusted memory for every AI agent.**
 
-Current development baseline: **v0.2.0-alpha.8**
+Current development baseline: **v0.2.0-alpha.9**
 
-`agent-memory-hub` is a local-first L2 memory and continuity layer for coding agents and LLM CLIs. It imports accessible L1 memory from each agent, keeps provenance and review status, detects duplicate/conflicting memories, and returns only a small relevant context pack when an agent needs past context.
+`agent-memory-hub` is a local-first shared L2 memory and continuity layer for AI coding agents. Its goal is simple: an agent should be able to continue useful prior work across agent, session, repository, branch, and worktree boundaries without making the user restate context.
 
-The product goal is broader than storage: **an agent should be able to continue useful prior work across agent/session/repository/worktree boundaries without making the user restate context.**
+Raw evidence is canonical; memories and summaries are governed indexes over that evidence, not unquestionable truth.
 
-## Why
+## Target experience
 
-LLMs already have L1 context/memory, but it is fragmented by product and constrained by each model's context window. This project adds a shared L2 layer:
-
-```text
-Claude L1 ─┐
-Codex L1 ──┤
-Gemini L1 ─┼──> agent-memory-hub (L2) ──> small context pack ──> any agent
-Other L1 ──┘
-```
-
-The design rule is simple: **raw evidence is canonical; summaries are indexes, not truth.**
-
-## Core principles
-
-- Bootstrap from existing L1 instead of starting from zero.
-- Keep source provenance for every memory.
-- Never silently overwrite conflicts.
-- Keep the fast path local: metadata + SQLite FTS5 first; semantic search is optional fallback.
-- Project only thin instructions/pointers back into agent L1 files.
-- Make normal use nearly invisible to the user.
-- Recall proactively when continuity matters; do nothing when prior context cannot materially affect the task.
-- Treat onboarding, resume, handoff, and worktree continuation as projections over the same governed L2 memory.
-
-## Seamless continuity target
-
-With the skill installed, users should normally be able to say things like:
+With the skill installed, ordinary prompts should be enough:
 
 ```text
 "이어서 구현해줘."
@@ -42,117 +18,86 @@ With the skill installed, users should normally be able to say things like:
 "Claude가 하던 작업을 Codex에서 이어서 해."
 ```
 
-without manually asking for a memory lookup or maintaining a separate handoff file as the source of truth.
-
-The target pipeline is:
+The current continuity pipeline is:
 
 ```text
 user request
   ↓
-local state detection
+Git repository/worktree/branch/HEAD inspection
   ↓
-cheap Continuity Gate
+local repository/session/checkpoint state detection
+  ↓
+cheap deterministic Continuity Gate
   ↓ only when relevant
-repository/worktree/task scope
+scope-aware SQLite FTS5/BM25 recall
   ↓
-FTS5/BM25 fast recall
+governance + conflict/review handling
   ↓
-governance filter
+HEAD-aware bounded Context Projector
   ↓
-HEAD-aware bounded context projection
+small context pack
   ↓
 agent continues work
 ```
 
-## Design status
-
-### v0.1 — working prototype
-
-The original implementation is intentionally small and dependency-free (Python standard library):
-
-- SQLite database with FTS5 when available
-- append-only event log
-- memory types/status/confidence/context quality
-- provenance/source pointers
-- duplicate detection by normalized statement hash
-- conflict candidates without destructive overwrite
-- recall producing compact context packs
-- import adapters for common text-based L1 files
-- doctor/status commands
-
-### v0.2.0-alpha.8 — HEAD-aware continuity projection baseline
-
-The v0.2 architecture is documented before full implementation:
-
-- [Architecture v0.2](docs/ARCHITECTURE-v0.2.md)
-- [Schema v2](docs/schema-v2.md)
-- [L1 migration & bootstrap workflow](docs/migration-workflow.md)
-- [Benchmark plan](docs/benchmark-plan.md)
-- [TDD/SOLID development guide](docs/DEVELOPMENT.md)
-
-Implemented groundwork includes:
-
-- non-destructive v1 → v2 schema migration path
-- Memory/Evidence separation groundwork and raw-source registration
-- package baseline under `src/agent_memory_hub`
-- domain execution/repository identity models
-- `RepositoryInspector`, `MemoryReader`, `ProjectionPolicy`, `RepositoryKnowledgeReader`, and `ContinuityStateStore` ports
-- tested Git remote normalization and canonical repository fingerprint primitive
-- concrete local Git inspector for repository root, common-dir, worktree identity, branch, and HEAD
-- explicit scope value object and precedence: task → worktree → branch → repository → global
-- repository-qualified branch/worktree/task storage keys that prevent cross-repository leakage
-- typed + scope-aware SQLite/FTS5 retrieval with specificity ranking
-- deterministic `ContinuityGate` with `NO_RECALL`, `RECALL`, `ONBOARDING`, `RESUME`, and `HANDOFF` modes
-- application-level zero-read path: `NO_RECALL` never invokes the memory reader
-- bounded recall candidate limits for continuity modes
-- pure `ContextProjector` that defensively filters stale lifecycles, deduplicates equivalent statements, preserves conflict/review warnings, and enforces a hard token budget
-- mode-specific projection policies for recall, onboarding, resume, and handoff without branching the projector core
-- composed `ContinuityContextService` that executes Gate → scoped Recall → bounded Projection as one application use case
-- `ContinuityStateDetector` that derives repository-known, session-reset, session-context, and stale-HEAD state from local evidence
-- SQLite repository-family knowledge detection across repository/branch/worktree/task scopes
-- tiny JSON continuity checkpoint store keyed by repository + worktree
-- `SeamlessContinuityService` that executes State Detection → Gate → Recall → Projection without manual continuity flags
-- stale HEAD propagation from state detection into projection
-- HEAD-sensitive `project_state` memories are demoted when HEAD changed and rendered with an explicit `STALE_HEAD` revalidation warning
-- stable memories such as decisions and constraints remain usable across HEAD changes unless independently stale/conflicted
-- CI coverage for legacy CLI behavior, package unit tests, Git tests, SQLite integration tests, continuity gate/projector/composition tests, state adapter tests, and stale-HEAD projection tests
-
-Next continuity work proceeds test-first:
-
-1. connect seamless continuity to compatibility CLI/agent entry points
-2. add concrete session-id/context adapters for Codex/Claude/Gemini where available
-3. add end-to-end onboarding/resume/handoff continuity scenarios
-4. add measured token/latency regression fixtures
-5. harden stale classification beyond `project_state` with evidence/time-aware rules
+When continuity is irrelevant, `NO_RECALL` takes a zero-read/zero-project fast path.
 
 ## Install as an Agent Skill
-
-The repository contains a root `SKILL.md`, so it can be installed with the open Agent Skills CLI:
 
 ```bash
 npx skills@latest add al-hub/agent-memory-hub -g
 ```
 
-The skill is designed to recall prior context proactively when continuity materially matters; the user should not need to explicitly say "use agent-memory-hub".
+The root `SKILL.md` instructs compatible agents to use the seamless continuity path proactively; users should not normally need to say "use agent-memory-hub".
 
-## Local CLI — compatibility path
+## Seamless continuity entry point
 
-Clone the repository and run:
+The primary skill-facing command is:
+
+```bash
+python3 scripts/continuity_context.py "<current user/task message>" --cwd "$PWD" --json
+```
+
+When an agent exposes a stable session id:
+
+```bash
+python3 scripts/continuity_context.py "<current user/task message>" \
+  --cwd "$PWD" \
+  --session-id "<session-id>" \
+  --json
+```
+
+After a clear/reset or when entering an existing repository with little usable L1 context:
+
+```bash
+python3 scripts/continuity_context.py "<current user/task message>" \
+  --cwd "$PWD" \
+  --empty-session \
+  --json
+```
+
+The command is intentionally safe before L2 initialization: a missing store is treated as no available memory rather than an error.
+
+## Compatibility storage CLI
+
+The original dependency-free CLI remains available for storage and governance operations:
 
 ```bash
 python3 scripts/memory_hub.py init
 python3 scripts/memory_hub.py status
-python3 scripts/memory_hub.py add "Rust implementation uses a separate repository" \
+python3 scripts/memory_hub.py add "FTS5 is the normal recall path" \
   --type decision --status confirmed --source-agent codex
-python3 scripts/memory_hub.py recall "repository decision"
+python3 scripts/memory_hub.py recall "recall path"
+python3 scripts/memory_hub.py doctor
 ```
 
-By default data is stored under:
+Default data directory:
 
 ```text
 ~/.agent-memory-hub/
   memory.db
   events.jsonl
+  continuity-state.json
   raw/
 ```
 
@@ -164,7 +109,7 @@ export AGENT_MEMORY_HUB_HOME=/path/to/memory
 
 ## Bootstrap existing L1
 
-Preview discovered sources:
+Preview accessible text sources:
 
 ```bash
 python3 scripts/memory_hub.py import-l1 --dry-run
@@ -176,25 +121,25 @@ Import them:
 python3 scripts/memory_hub.py import-l1
 ```
 
-The current adapter imports only accessible text files and never claims access to private product memory that is not present on disk. Add or override files explicitly with `--source PATH`.
+The importer only uses sources actually accessible on disk. It never assumes access to private product memory.
 
-The v0.2 bootstrap direction replaces eager full-corpus understanding with:
+The v0.2 direction is lazy rather than eager:
 
 ```text
 Discover L1
   → preserve/register raw sources
   → hash + metadata/FTS index
-  → ready immediately
+  → become usable quickly
   → lazily extract structured memories only when relevant
 ```
 
-## Memory governance — v0.2 direction
+## Memory governance
 
-A memory claim and its evidence become separate records:
+A memory claim and its evidence are separate concepts:
 
 ```text
 Memory
-  ├─ Evidence A → raw transcript
+  ├─ Evidence A → raw transcript/session
   ├─ Evidence B → project file
   └─ Evidence C → explicit user decision
 ```
@@ -212,7 +157,31 @@ confidence:
   0.0 .. 1.0
 ```
 
-Memory is typed and scoped so unrelated contexts do not create false conflicts.
+Conflicts are surfaced rather than silently overwritten. Suspicious/noisy content should be quarantined instead of destructively merged.
+
+## Scope model
+
+Current precedence is:
+
+```text
+task
+> worktree
+> branch
+> repository
+> global
+```
+
+Branch/worktree/task storage references are repository-qualified so `main` in one repository cannot leak into another repository.
+
+## HEAD-aware continuity
+
+The local continuity checkpoint stores repository/worktree session and HEAD information. If HEAD changed since the prior checkpoint:
+
+- stable memories such as verified decisions and constraints remain usable;
+- volatile `project_state` is demoted below stable context;
+- the projected item receives an explicit `STALE_HEAD` warning and must be revalidated against current code.
+
+This keeps old execution state from being treated as current truth while preserving useful durable knowledge.
 
 ## Fast retrieval path
 
@@ -221,89 +190,78 @@ query
   → scope/type filter
   → SQLite FTS5/BM25
   → governance filter
-  → optional semantic fallback
-  → optional rerank only when necessary
-  → compact context pack
+  → mode-specific ranking
+  → dedupe
+  → hard token budget
+  → context pack
 ```
 
-The normal path deliberately avoids embeddings and external services.
+Embeddings, external services, and LLM reranking are deliberately excluded from the normal fast path. Semantic fallback remains a future optional fallback after lexical retrieval is measured.
+
+## v0.2.0-alpha.9 status
+
+Implemented and tested:
+
+- non-destructive v1 → v2 migration groundwork
+- Memory/Evidence + raw-source groundwork
+- Git remote normalization and canonical repository identity
+- repository/worktree/branch/HEAD inspection
+- repository-qualified scope hierarchy and isolation
+- typed + scope-aware SQLite/FTS5 retrieval
+- deterministic `NO_RECALL / RECALL / ONBOARDING / RESUME / HANDOFF` Continuity Gate
+- zero-read fast path when continuity is irrelevant
+- mode-specific bounded Context Projector
+- conflict/review warnings and duplicate collapse
+- repository/session/checkpoint state detection
+- tiny JSON continuity state store
+- stale-HEAD detection and projection rules
+- composed seamless continuity application service
+- skill-facing `scripts/continuity_context.py` entry point
+- machine-readable JSON output for agent integration
+- safe behavior when the store is not initialized
+- end-to-end subprocess tests for Git and non-Git contexts
+- CI across Python 3.10, 3.12, and 3.13
+
+Architecture docs:
+
+- [Architecture v0.2](docs/ARCHITECTURE-v0.2.md)
+- [Schema v2](docs/schema-v2.md)
+- [L1 migration & bootstrap](docs/migration-workflow.md)
+- [Benchmark plan](docs/benchmark-plan.md)
+- [TDD/SOLID development guide](docs/DEVELOPMENT.md)
 
 ## Development discipline
 
-Long-term development follows:
+Core development follows:
 
 ```text
 RED → GREEN → REFACTOR → PERF
 ```
 
-Core logic follows SOLID boundaries so Git, SQLite, source adapters, retrieval strategies, and projection presets can evolve without turning the memory core into one large conditional script. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+The domain/application layer does not depend directly on Git subprocesses, SQLite, or agent-specific APIs. External systems are behind ports/adapters so Codex, Claude, Gemini, MCP, and future integrations can share the same continuity engine.
 
-The main product regression metric is **Continuity Success Rate**:
+Primary quality metric:
 
-> Can the agent continue the correct work without asking the user to restate previously available project context?
+> **Continuity Success Rate:** Can the agent continue the correct work without asking the user to restate previously available project context?
 
-## Current compatibility commands
+Secondary metrics include wrong-scope injection, stale-state usage, silent-conflict rate, context tokens, p50/p95 latency, and manual memory invocation count.
 
-```text
-init        initialize L2 storage
-add         add one governed memory
-recall      retrieve relevant memories
-status      show store statistics
-inspect     inspect one memory
-resolve     change a memory status / supersession
-import-l1   discover and import accessible L1 text files
-doctor      validate DB, FTS, event log and source paths
-```
+## Next work
 
-## Example target experience
+The next implementation slices are:
 
-After weeks of work across agents:
+1. concrete Codex/Claude/Gemini session/context adapters where their local interfaces expose stable signals;
+2. end-to-end onboarding/resume/handoff fixtures with real SQLite scoped memories;
+3. measured latency/token regression tests;
+4. automatic meaningful-event capture (`memory.propose`) with governance;
+5. cold-source lazy extraction and cache;
+6. MCP gateway and thin per-agent projections.
 
-```text
-User: 이어서 구현해줘.
-
-Codex
-  → detects repository/worktree/session continuity locally
-  → Continuity Gate selects resume
-  → repository/worktree scoped FTS5 recall
-  → governed, deduplicated, token-budgeted context projection
-
-If HEAD changed since the stored checkpoint:
-- verified decisions/constraints remain available
-- volatile project_state is moved behind stable context
-- project_state is marked STALE_HEAD and must be revalidated against current code
-```
-
-If two memories disagree, the hub surfaces the conflict rather than inventing a winner.
-
-## Roadmap
-
-Implementation order for v0.2:
-
-1. schema-v2 migration with lossless v0.1 compatibility
-2. evidence/raw-source model
-3. repository/worktree/branch execution identity
-4. typed/scope-aware retrieval
-5. Continuity Gate
-6. token-budget Context Projector
-7. composed ContinuityContextService
-8. seamless continuity state detection
-9. HEAD-aware stale projection
-10. onboarding/resume/handoff/worktree continuity presets
-11. compatibility CLI + agent entry points
-12. concrete per-agent session adapters and thin projections
-13. cold-source index + lazy extraction interfaces
-14. conflict/update/different-context classifier
-15. quarantine + secret/contamination guards
-16. MCP gateway
-17. benchmark harness and regression gates
-18. optional semantic fallback after the fast path is measured
-
-`worktree-context` should remain a reference/compatibility benchmark until agent-memory-hub passes automatic repository onboarding, worktree resume, cross-agent handoff, session-reset continuity, and HEAD-aware stale detection.
+`worktree-context` remains a compatibility/reference benchmark until automatic onboarding, worktree resume, cross-agent handoff, session-reset continuity, and HEAD-aware stale handling are all proven in real agent workflows.
 
 ## Safety / privacy
 
-Memory is local by default. The hub should never upload raw conversations implicitly. Import only sources the user can access and explicitly configured paths. External LLM extraction must be opt-in/configured. Suspicious or noisy content should be quarantined rather than silently promoted or destructively deleted.
+Memory is local by default. Raw conversations are never uploaded implicitly. External LLM extraction, if added later, must be opt-in/configured. Only accessible/configured sources should be imported.
 
 ## License
 
