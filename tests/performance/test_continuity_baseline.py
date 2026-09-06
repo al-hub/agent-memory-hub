@@ -26,7 +26,7 @@ class ContinuityBaselineHarnessTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             BENCH.parse_sizes("0,100")
 
-    def test_small_real_pipeline_benchmark_returns_expected_scenarios(self):
+    def test_small_real_pipeline_benchmark_returns_expected_scenarios_and_phases(self):
         result = BENCH.benchmark_tier(
             100,
             warmup=0,
@@ -54,6 +54,23 @@ class ContinuityBaselineHarnessTest(unittest.TestCase):
         self.assertEqual(scenarios["session_start_onboarding"]["mode"], "onboarding")
         self.assertEqual(scenarios["session_start_resume"]["mode"], "resume")
         self.assertTrue(scenarios["stale_head_resume"]["stale_head"])
+
+        phases = result["isolated_phases"]
+        expected_phases = {
+            "python_startup",
+            "git_inspect",
+            "repository_known",
+            "checkpoint_load",
+            "checkpoint_save",
+            "sqlite_scope_browse",
+            "sqlite_fts_recall",
+            "project_resume",
+        }
+        self.assertEqual(set(phases), expected_phases)
+        for values in phases.values():
+            self.assertIn("p50_ms", values)
+            self.assertIn("p95_ms", values)
+            self.assertGreaterEqual(values["p50_ms"], 0)
 
 
 if __name__ == "__main__":
