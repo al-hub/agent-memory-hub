@@ -14,6 +14,7 @@ class ContextProjector:
     """Pure bounded projection from governed memory candidates to an agent context pack."""
 
     _BLOCKED_LIFECYCLES = {"superseded", "quarantined"}
+    _HEAD_SENSITIVE_TYPES = {"project_state"}
     _REVIEW_PRIORITY = {
         "verified": 0,
         "unverified": 1,
@@ -29,19 +30,27 @@ class ContextProjector:
         # tokenizer accounting becomes necessary for a target agent.
         return max(1, math.ceil(len(text) / 4))
 
-    def _warning(self, memory: MemoryCandidate) -> str | None:
+    def _warning(self, memory: MemoryCandidate, *, stale_head: bool = False) -> str | None:
+        warnings: list[str] = []
+        if stale_head and memory.memory_type in self._HEAD_SENSITIVE_TYPES:
+            warnings.append("STALE_HEAD: repository HEAD changed; revalidate this state against current code.")
         if memory.review_state == "conflict":
-            return "CONFLICT: unresolved memory; do not treat as verified truth."
-        if memory.review_state == "needs_review":
-            return "NEEDS_REVIEW: context is not yet verified."
-        if memory.review_state == "unverified":
-            return "UNVERIFIED: use cautiously and verify when material."
-        return None
+            warnings.append("CONFLICT: unresolved memory; do not treat as verified truth.")
+        elif memory.review_state == "needs_review":
+            warnings.append("NEEDS_REVIEW: context is not yet verified.")
+        elif memory.review_state == "unverified":
+            warnings.append("UNVERIFIED: use cautiously and verify when material.")
+        return " ".join(warnings) if warnings else None
 
     def _item_cost(self, item: ContextItem) -> int:
         warning = f" {item.warning}" if item.warning else ""
         rendered = f"[{item.memory_type}/{item.scope}/{item.review_state}] {item.statement}{warning}"
         return self._estimate_tokens(rendered)
+
+    def _stale_penalty(self, memory: MemoryCandidate, *, stale_head: bool) -> int:
+        if stale_head and memory.memory_type in self._HEAD_SENSITIVE_TYPES:
+            return 100
+        return 0
 
     def project(
         self,
@@ -50,6 +59,7 @@ class ContextProjector:
         mode: ContinuityMode,
         token_budget: int = 1000,
         policy: ProjectionPolicy | None = None,
+        stale_head: bool = False,
     ) -> ContextPack:
         budget = max(1, token_budget)
         policy = policy or ContinuityProjectionPolicy(mode)
@@ -57,7 +67,7 @@ class ContextProjector:
         eligible = [m for m in candidates if m.lifecycle not in self._BLOCKED_LIFECYCLES]
         eligible.sort(
             key=lambda m: (
-                policy.priority(m),
+                policy.priority(m) + self._stale_penalty(m, stale_head=stale_head),
                 self._REVIEW_PRIORITY.get(m.review_state, 9),
                 m.scope_rank,
                 -m.confidence,
@@ -86,7 +96,7 @@ class ContextProjector:
                 scope=memory.scope,
                 review_state=memory.review_state,
                 confidence=memory.confidence,
-                warning=self._warning(memory),
+                warning=self._warning(memory, stale_head=stale_head),
             )
             cost = self._item_cost(item)
             if used + cost > budget:
