@@ -2,7 +2,7 @@
 
 **One trusted memory for every AI agent.**
 
-Current development baseline: **v0.2.0-alpha.9**
+Current development baseline: **v0.2.0-alpha.10**
 
 `agent-memory-hub` is a local-first shared L2 memory and continuity layer for AI coding agents. Its goal is simple: an agent should be able to continue useful prior work across agent, session, repository, branch, and worktree boundaries without making the user restate context.
 
@@ -21,7 +21,7 @@ With the skill installed, ordinary prompts should be enough:
 The current continuity pipeline is:
 
 ```text
-user request
+SessionStart hook or user request
   ↓
 Git repository/worktree/branch/HEAD inspection
   ↓
@@ -29,7 +29,7 @@ local repository/session/checkpoint state detection
   ↓
 cheap deterministic Continuity Gate
   ↓ only when relevant
-scope-aware SQLite FTS5/BM25 recall
+scope-aware SQLite FTS5/BM25 recall or bounded scope browse
   ↓
 governance + conflict/review handling
   ↓
@@ -50,9 +50,45 @@ npx skills@latest add al-hub/agent-memory-hub -g
 
 The root `SKILL.md` instructs compatible agents to use the seamless continuity path proactively; users should not normally need to say "use agent-memory-hub".
 
-## Seamless continuity entry point
+## Hook-native seamless continuity
 
-The primary skill-facing command is:
+Codex CLI, Claude Code, and Gemini CLI all expose a `SessionStart` hook payload containing a stable `session_id`, `cwd`, and `source`. `agent-memory-hub` normalizes those payloads through one shared adapter and returns hook-compatible `additionalContext` JSON.
+
+Shared entry point:
+
+```bash
+python3 /path/to/agent-memory-hub/scripts/session_start_hook.py --agent codex
+python3 /path/to/agent-memory-hub/scripts/session_start_hook.py --agent claude
+python3 /path/to/agent-memory-hub/scripts/session_start_hook.py --agent gemini
+```
+
+Each command reads the agent's hook JSON from stdin and writes only valid hook JSON to stdout.
+
+Supported SessionStart source behavior:
+
+```text
+startup              → empty L1; known repo becomes ONBOARDING
+resume               → RESUME refresh
+clear                → RESUME refresh even if session id is unchanged
+compact              → RESUME refresh (Codex / Claude)
+fork                 → RESUME refresh (Claude)
+```
+
+Hook failures are intentionally fail-open: an invalid payload or memory error never blocks the coding agent from starting. The hook emits an empty valid SessionStart response and writes the warning to stderr.
+
+A typical Codex hook command in `~/.codex/hooks.json` points its `SessionStart` command to:
+
+```text
+python3 /path/to/agent-memory-hub/scripts/session_start_hook.py --agent codex
+```
+
+Claude Code uses the same command shape in its `SessionStart` hook settings with `--agent claude`; Gemini CLI uses `--agent gemini`.
+
+The next install/UX slice will automate these per-agent config edits so users do not have to maintain the paths manually.
+
+## Prompt-facing seamless continuity entry point
+
+The skill-facing fallback/explicit command remains:
 
 ```bash
 python3 scripts/continuity_context.py "<current user/task message>" --cwd "$PWD" --json
@@ -77,6 +113,16 @@ python3 scripts/continuity_context.py "<current user/task message>" \
 ```
 
 The command is intentionally safe before L2 initialization: a missing store is treated as no available memory rather than an error.
+
+## Why SessionStart needs scope browse
+
+A SessionStart hook fires before a new user prompt exists. A pure lexical query would therefore be empty and return no memories. The package now treats an empty internal recall query as a **bounded browse of currently visible scopes**:
+
+```text
+worktree → branch → repository → global
+```
+
+Foreign repository scopes and superseded/quarantined memories remain excluded. The Context Projector then applies onboarding/resume type priorities, governance state, dedupe, and token budget. Normal non-empty queries still use FTS5/BM25 first.
 
 ## Compatibility storage CLI
 
@@ -185,6 +231,8 @@ This keeps old execution state from being treated as current truth while preserv
 
 ## Fast retrieval path
 
+Normal prompt recall:
+
 ```text
 query
   → scope/type filter
@@ -196,9 +244,21 @@ query
   → context pack
 ```
 
+SessionStart without a prompt:
+
+```text
+empty query
+  → bounded visible-scope browse
+  → governance filter
+  → mode-specific ranking
+  → dedupe
+  → hard token budget
+  → additionalContext
+```
+
 Embeddings, external services, and LLM reranking are deliberately excluded from the normal fast path. Semantic fallback remains a future optional fallback after lexical retrieval is measured.
 
-## v0.2.0-alpha.9 status
+## v0.2.0-alpha.10 status
 
 Implemented and tested:
 
@@ -208,7 +268,9 @@ Implemented and tested:
 - repository/worktree/branch/HEAD inspection
 - repository-qualified scope hierarchy and isolation
 - typed + scope-aware SQLite/FTS5 retrieval
+- bounded visible-scope browse when SessionStart has no prompt text
 - deterministic `NO_RECALL / RECALL / ONBOARDING / RESUME / HANDOFF` Continuity Gate
+- SessionStart source-aware onboarding/resume decisions
 - zero-read fast path when continuity is irrelevant
 - mode-specific bounded Context Projector
 - conflict/review warnings and duplicate collapse
@@ -216,10 +278,13 @@ Implemented and tested:
 - tiny JSON continuity state store
 - stale-HEAD detection and projection rules
 - composed seamless continuity application service
-- skill-facing `scripts/continuity_context.py` entry point
-- machine-readable JSON output for agent integration
+- prompt-facing `scripts/continuity_context.py` entry point
+- shared `scripts/session_start_hook.py` for Codex / Claude / Gemini
+- normalized hook profiles for agent-specific SessionStart source support
+- hook-compatible `hookSpecificOutput.additionalContext` rendering
+- fail-open hook behavior
 - safe behavior when the store is not initialized
-- end-to-end subprocess tests for Git and non-Git contexts
+- end-to-end subprocess tests for Git/non-Git contexts and all three SessionStart agents
 - CI across Python 3.10, 3.12, and 3.13
 
 Architecture docs:
@@ -250,8 +315,8 @@ Secondary metrics include wrong-scope injection, stale-state usage, silent-confl
 
 The next implementation slices are:
 
-1. concrete Codex/Claude/Gemini session/context adapters where their local interfaces expose stable signals;
-2. end-to-end onboarding/resume/handoff fixtures with real SQLite scoped memories;
+1. one-command installation/removal of SessionStart hooks for Codex / Claude / Gemini;
+2. end-to-end cross-agent handoff fixtures using persisted scoped memories;
 3. measured latency/token regression tests;
 4. automatic meaningful-event capture (`memory.propose`) with governance;
 5. cold-source lazy extraction and cache;
