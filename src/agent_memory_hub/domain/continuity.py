@@ -21,6 +21,7 @@ class ContinuityRequest:
     repository_known: bool = False
     session_has_context: bool = True
     session_reset: bool = False
+    stale_head: bool = False
 
 
 @dataclass(frozen=True, slots=True)
