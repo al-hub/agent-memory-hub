@@ -21,6 +21,8 @@ jobs:
         run: |
           python -m py_compile scripts/memory_hub.py
           python -m py_compile benchmarks/continuity_baseline.py
+          python -m py_compile benchmarks/machine_benchmark.py
+          python -m py_compile benchmarks/startup_breakdown.py
           python -m py_compile benchmarks/scope_first_ab.py
           python -m py_compile benchmarks/scope_first_three_way.py
           python -m compileall -q src
@@ -42,6 +44,25 @@ jobs:
           node --check bin/agent-memory-hub.mjs
           node --check bin/lib/installer.mjs
           npm test
+
+  benchmark-startup:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fresh-process startup breakdown
+        run: |
+          python benchmarks/startup_breakdown.py \
+            --iterations 20 \
+            --output startup-breakdown.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: startup-breakdown
+          path: startup-breakdown.json
 
   benchmark-baseline:
     runs-on: ubuntu-latest
