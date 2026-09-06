@@ -14,9 +14,33 @@ Use `agent-memory-hub` as a shared, agent-independent L2 memory and continuity l
 - Raw evidence is canonical. Summaries/memories are indexes and interpretations, not unquestionable truth.
 - Continuity should feel seamless: recall useful prior context when needed without requiring the user to say "use memory" or name this skill.
 
+## Hook-native path
+
+When the host agent supports `SessionStart` hooks, prefer the shared hook entry point so session identity and reset/resume state come directly from the agent instead of being guessed:
+
+```bash
+python3 scripts/session_start_hook.py --agent codex
+python3 scripts/session_start_hook.py --agent claude
+python3 scripts/session_start_hook.py --agent gemini
+```
+
+The hook reads JSON from stdin and returns hook-compatible JSON on stdout. It normalizes `session_id`, `cwd`, and `source`, then runs repository/worktree/HEAD detection, continuity gating, scoped retrieval, governance, stale-HEAD handling, and bounded projection.
+
+Source semantics:
+
+- `startup`: new/empty L1; if the repository is known, project an onboarding pack.
+- `resume`: refresh a resume pack.
+- `clear`: refresh a resume pack even if the agent keeps the same session id.
+- `compact`: refresh a resume pack when supported.
+- `fork`: refresh a resume pack when supported.
+
+Hook failures are fail-open and must never prevent the coding agent from starting. If hook input is invalid or L2 is unavailable, return an empty valid SessionStart response and continue.
+
+A SessionStart hook has no user prompt yet. In that case the memory reader performs a bounded browse of currently visible scopes rather than a lexical search, and the projector selects only the mode-relevant memories within the token budget.
+
 ## Default seamless path
 
-For continuity-sensitive work, prefer the seamless continuity entry point over manual broad recall:
+When hook-native invocation is not installed or when continuity must be evaluated for the current user prompt, prefer the seamless continuity entry point over manual broad recall:
 
 ```bash
 python3 scripts/continuity_context.py "<current user/task message>" --cwd "$PWD" --json
