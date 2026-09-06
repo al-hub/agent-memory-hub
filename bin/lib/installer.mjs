@@ -21,7 +21,6 @@ export function managedHook(agent, runtimeDir) {
         name: MANAGED_HOOK_NAME,
         type: 'command',
         command: `python3 ${quoteShell(script)} --agent ${agent}`,
-        timeout: 10000,
       },
     ],
   };
@@ -151,8 +150,13 @@ export function installSkill({ packageRoot, skipSkill = false } = {}) {
 
 export function uninstallSkill({ packageRoot, skipSkill = false } = {}) {
   if (skipSkill) return { skipped: true };
-  // skills CLI does not guarantee a stable remove command across versions.
-  // Keep hook/runtime uninstall deterministic; users can remove the skill with their
-  // Agent Skills manager if their installed CLI exposes removal.
-  return { skipped: true, reason: 'skill removal left to Agent Skills manager' };
+  const result = spawnSync('npx', ['-y', 'skills@latest', 'remove', MANAGED_HOOK_NAME, '-g', '-y'], {
+    cwd: packageRoot,
+    encoding: 'utf8',
+    stdio: ['inherit', 'pipe', 'pipe'],
+  });
+  if (result.status !== 0) {
+    throw new Error(`Agent Skill removal failed: ${(result.stderr || result.stdout || '').trim()}`);
+  }
+  return { skipped: false, output: (result.stdout || '').trim() };
 }
