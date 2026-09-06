@@ -1,0 +1,28 @@
+{
+  "name": "@al-hub/agent-memory-hub",
+  "version": "0.2.0-alpha.11",
+  "description": "Local-first shared L2 memory and continuity layer for AI coding agents",
+  "type": "module",
+  "bin": {
+    "agent-memory-hub": "bin/agent-memory-hub.mjs"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "src/",
+    "SKILL.md",
+    "README.md",
+    "pyproject.toml"
+  ],
+  "scripts": {
+    "test": "node --test tests_node/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/al-hub/agent-memory-hub.git"
+  }
+}
