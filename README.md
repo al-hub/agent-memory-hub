@@ -2,29 +2,21 @@
 
 **One trusted memory for every AI agent.**
 
-Current development baseline: **v0.2.0-alpha.16**
+Current development baseline: **v0.2.0-alpha.17**
 
-`agent-memory-hub` is a local-first shared L2 memory and continuity layer for AI coding agents. It is specialized for practical coding workflows: fast startup/resume, repository/worktree/HEAD correctness, bounded context, cross-agent handoff, and minimal manual memory commands.
+`agent-memory-hub` is a local-first shared L2 memory and continuity layer for AI coding agents. It is specialized for practical coding workflows: fast resume, repository/worktree/HEAD correctness, bounded context, persisted cross-agent handoff, and minimal manual memory commands.
 
 Raw evidence is canonical. Governed memories and summaries are rebuildable indexes/projections over that evidence.
 
 ## One-command install
 
-Until the scoped npm package is published, the GitHub-backed form must explicitly opt in to Git fetching on npm 12+:
+Until the scoped npm package is published, npm 12+ must explicitly opt in to Git-backed package fetching for that command:
 
 ```bash
 npx --allow-git=all -y github:al-hub/agent-memory-hub install
 ```
 
-This opts in for that command only; it does not require changing the global npm policy.
-
-After npm publication the same CLI contract will be:
-
-```bash
-npx -y @al-hub/agent-memory-hub@latest install
-```
-
-Install selected agents only:
+Selected agents only:
 
 ```bash
 npx --allow-git=all -y github:al-hub/agent-memory-hub install --agents codex,claude
@@ -37,46 +29,13 @@ npx --allow-git=all -y github:al-hub/agent-memory-hub status
 npx --allow-git=all -y github:al-hub/agent-memory-hub uninstall
 ```
 
-The installer installs the Agent Skill, copies a stable runtime to `~/.agent-memory-hub/runtime`, initializes the local store, and merges SessionStart hooks into Codex / Claude / Gemini configuration. Existing unrelated settings/hooks are preserved. Uninstall removes managed hooks/runtime/skill while preserving memory data.
-
-## Practical local benchmark
-
-Run the same practical baseline on a real WSL/Linux machine without cloning the repository:
+After npm publication the intended form is:
 
 ```bash
-npx --allow-git=all -y github:al-hub/agent-memory-hub benchmark
+npx -y @al-hub/agent-memory-hub@latest install
 ```
 
-The full benchmark measures 1k / 10k / 50k / 100k synthetic governed-memory tiers and records:
-
-- WSL version/distribution, kernel, CPU, RAM;
-- Node, Python, Git, SQLite and FTS5 availability;
-- filesystem type for the current directory, memory home, and system temp;
-- warm in-process NO_RECALL / Resume / Handoff / SessionStart latency;
-- fresh-process NO_RECALL / Resume / Handoff latency;
-- real Codex / Claude / Gemini SessionStart hook latency;
-- p50 / p95 distributions and a machine-readable JSON report.
-
-`fresh-process` means a new Python process for each continuity request. It intentionally does **not** claim to flush the operating-system page cache.
-
-For a faster smoke measurement:
-
-```bash
-npx --allow-git=all -y github:al-hub/agent-memory-hub benchmark --quick
-```
-
-Custom example:
-
-```bash
-npx --allow-git=all -y github:al-hub/agent-memory-hub benchmark \
-  --sizes 1000,10000,50000,100000 \
-  --warmup 5 \
-  --iterations 30 \
-  --subprocess-iterations 10 \
-  --output amh-wsl-benchmark.json
-```
-
-Default output is `./agent-memory-hub-benchmark.json`. Synthetic fixtures are temporary and are removed after the run; the real memory database is not populated with benchmark memories.
+The installer copies a stable runtime to `~/.agent-memory-hub/runtime`, initializes the local store, and merges SessionStart hooks for Codex / Claude / Gemini without replacing unrelated settings. Memory data survives runtime upgrades/uninstall.
 
 ## Target experience
 
@@ -85,63 +44,29 @@ Users should normally work as usual:
 ```text
 "이어서 구현해줘."
 "아까 하던 성능 분석 계속해."
-"Claude가 하던 작업을 Codex에서 이어서 해."
 ```
 
-Continuity flow:
+Agent changes are also persisted automatically:
 
 ```text
-SessionStart hook or user request
+Codex works in repo/worktree
   ↓
-Git repository / worktree / branch / HEAD inspection
+checkpoint records last agent = codex
   ↓
-repository / session / checkpoint state
+Claude starts in the same repo/worktree
   ↓
-Continuity Gate
-  ├─ NO_RECALL
-  ├─ RECALL
-  ├─ ONBOARDING
-  ├─ RESUME
-  └─ HANDOFF
-  ↓ only when needed
-scope-first SQLite FTS / bounded SessionStart scope browse
+HANDOFF selected automatically
   ↓
-governance + stale-HEAD handling
-  ↓
-bounded Context Projector
-  ↓
-small additionalContext / context pack
+Claude receives bounded governed L2 context
 ```
 
-`NO_RECALL` deliberately skips archive retrieval and projection.
+No separate handoff database is introduced; governed L2 memory remains the durable source.
 
-## Hook-native continuity
-
-Installed hooks point to the persistent runtime:
+Continuity modes:
 
 ```text
-python3 ~/.agent-memory-hub/runtime/scripts/session_start_hook.py --agent <agent>
+NO_RECALL | RECALL | ONBOARDING | RESUME | HANDOFF
 ```
-
-Current SessionStart behavior:
-
-```text
-startup  → ONBOARDING when prior repository memory exists
-resume   → RESUME
-clear    → RESUME even when session id is unchanged
-compact  → RESUME where supported
-fork     → RESUME where supported
-```
-
-Hook failures are fail-open: memory problems must never prevent the coding agent itself from starting.
-
-At SessionStart there may be no user prompt, so the system uses bounded visible-scope browse instead of lexical search:
-
-```text
-worktree → branch → repository → global
-```
-
-## Scope model
 
 Visibility precedence:
 
@@ -149,104 +74,128 @@ Visibility precedence:
 task > worktree > branch > repository > global
 ```
 
-Branch/worktree/task refs are repository-qualified. If repository HEAD changes, volatile `project_state` is demoted and marked `STALE_HEAD`; stable verified decisions and constraints remain available unless independently invalidated.
+Repository-local refs are repository-qualified. If HEAD changes, volatile `project_state` is marked `STALE_HEAD` and must be revalidated; stable decisions/constraints may remain useful.
 
-## Scope-first FTS is now the production recall path
+## Hook-native continuity
 
-The pre-alpha.15 lexical path matched statement text broadly and applied repository/worktree scope after FTS matching. Synthetic 100k-memory tests showed that foreign repositories sharing the same lexical terms caused recall to grow toward ~100 ms and beyond.
+Installed hooks run:
 
-The production layout is now one FTS index:
+```text
+python3 ~/.agent-memory-hub/runtime/scripts/session_start_hook.py --agent <agent>
+```
+
+SessionStart behavior:
+
+```text
+startup  → ONBOARDING when prior repository memory exists
+resume   → RESUME
+clear    → RESUME even if session id is unchanged
+compact  → RESUME where supported
+fork     → RESUME where supported
+agent change in known repo/worktree → HANDOFF
+```
+
+Hooks are fail-open: memory failure must never block the coding agent itself.
+
+SessionStart normally has no user query, so it uses bounded visible-scope browse instead of lexical FTS. Prompt-facing continuity uses scope-first FTS.
+
+## Scope-first FTS
+
+Production prompt recall uses one FTS5 index:
 
 ```text
 memory_fts(id, statement, scope_key)
 ```
 
-`scope_key` is a tokenizer-safe deterministic token derived from `(scope, scope_ref)`. Prompt recall intersects visible scope postings and statement postings inside FTS5 before joining governed memories.
+`scope_key` is a deterministic token derived from `(scope, scope_ref)`. Visible scope postings and lexical postings are intersected inside FTS5 before governed-memory filtering.
 
-### Three-way validation
+Three-way validation preserved identical ordered top-8 results at every measured tier:
 
-Broad FTS, the earlier two-index experiment, and the new single-index layout were measured on identical corpora and queries. Ordered top-8 result IDs were identical at every tier.
-
-| Memories | Broad p50 | Two-index p50 | Single-index p50 | Single speedup | Two-index extra | Single-index extra |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1k | 1.032 ms | 0.344 ms | 0.324 ms | 3.19x | 0.23 MiB | 0.03 MiB |
-| 10k | 9.142 ms | 0.877 ms | 0.811 ms | 11.27x | 2.11 MiB | 0.33 MiB |
-| 50k | 42.121 ms | 2.502 ms | 2.449 ms | 17.20x | 9.86 MiB | 0.46 MiB |
-| 100k | 85.547 ms | 4.494 ms | 4.450 ms | **19.22x** | 21.10 MiB | **3.02 MiB** |
-
-The single-index layout keeps the scope-first speedup while removing most duplicate-index storage.
-
-### Production continuity baseline after adoption
-
-After switching the real continuity composition to the single-index reader:
-
-| Memories | NO_RECALL p50 | Resume p50 | Handoff p50 | SessionStart resume p50 | Codex hook p50 |
+| Memories | Broad p50 | Two-index p50 | Single-index p50 | Single speedup | Single extra storage |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1k | 9.087 ms | 10.361 ms | 10.228 ms | 9.722 ms | 89.184 ms |
-| 10k | 8.651 ms | 10.345 ms | 10.264 ms | 11.989 ms | 93.028 ms |
-| 50k | 8.723 ms | 13.256 ms | 12.996 ms | 22.136 ms | 103.489 ms |
-| 100k | 8.723 ms | **16.547 ms** | **16.538 ms** | 34.983 ms | 116.151 ms |
+| 1k | 1.032 ms | 0.344 ms | 0.324 ms | 3.19x | 0.03 MiB |
+| 10k | 9.142 ms | 0.877 ms | 0.811 ms | 11.27x | 0.33 MiB |
+| 50k | 42.121 ms | 2.502 ms | 2.449 ms | 17.20x | 0.46 MiB |
+| 100k | 85.547 ms | 4.494 ms | 4.450 ms | **19.22x** | **3.02 MiB** |
 
-The pre-adoption 100k resume/handoff baseline was roughly **146 ms p50**. The production prompt-facing path is now about **16.5 ms p50** while NO_RECALL remains flat.
+A legacy two-column FTS is non-destructively rebuilt from canonical `memories`. Compatibility writes are tracked through a small dirty-row table and repaired before prompt recall.
 
-SessionStart is intentionally different: with no prompt it uses bounded scope browse, so lexical scope-first FTS does not change that path in the same way.
+## Real-machine benchmark
 
-These measurements are reference baselines, not latency guarantees or CI performance gates.
-
-## Non-destructive FTS migration and legacy synchronization
-
-Continuity now calls `ensure_single_index_scope_fts()` before composing the reader.
-
-The governed `memories` table is never rewritten by this migration. A legacy two-column `memory_fts(id, statement)` is rebuildable cache, so it is safely reconstructed as the single scope-aware index.
-
-```text
-legacy two-column FTS
-  ↓
-rebuild FTS only
-  ↓
-memory_fts(id, statement, scope_key)
-```
-
-Compatibility writers can still write the legacy `(id, statement)` shape. Small triggers record changed `memories.rowid` values in `scope_fts_dirty`; the next continuity entry repairs only those dirty FTS rows and handles insert/update/delete. Clean read paths do not rebuild the archive.
-
-If migration cannot run because the store is missing/incompatible/locked, continuity fails safe and the existing broad/LIKE fallback remains available.
-
-## Performance records
-
-Detailed records:
-
-- [First 1k/10k baseline](docs/baseline-alpha11.md)
-- [1k–100k scale + phase breakdown](docs/baseline-alpha12-scale.md)
-- [Two-index scope-first A/B](docs/scope-first-fts-ab-alpha13.md)
-- [Single-index three-way + production adoption](docs/scope-first-single-index-alpha15.md)
-- [Benchmark plan](docs/benchmark-plan.md)
-
-Reproduce the production continuity baseline directly from a checkout:
+Run the packaged benchmark without cloning:
 
 ```bash
-python3 benchmarks/continuity_baseline.py \
-  --sizes 1000,10000,50000,100000 \
-  --warmup 5 \
-  --iterations 30 \
-  --subprocess-iterations 10 \
-  --output benchmark-results.json
+npx --allow-git=all -y github:al-hub/agent-memory-hub benchmark --quick
 ```
 
-Reproduce the three-way comparison:
+Full 1k / 10k / 50k / 100k run:
 
 ```bash
-python3 benchmarks/scope_first_three_way.py \
-  --sizes 1000,10000,50000,100000 \
-  --warmup 5 \
-  --iterations 30 \
-  --output scope-first-three-way-results.json
+npx --allow-git=all -y github:al-hub/agent-memory-hub benchmark
 ```
 
-CI uploads both benchmark artifacts. The three-way job fails if ordered result IDs diverge.
+It records:
+
+- WSL / kernel / CPU / RAM / filesystem metadata;
+- Python / Node / Git / SQLite / FTS5 versions;
+- warm in-process NO_RECALL / Resume / Handoff;
+- fresh-process NO_RECALL / Resume / Handoff;
+- real Codex / Claude / Gemini SessionStart hook latency;
+- startup/import/composition phase breakdown;
+- p50 / p95 and a JSON report.
+
+Default report: `./agent-memory-hub-benchmark.json`.
+
+Synthetic fixtures are temporary and do not populate the real memory DB. `fresh-process` means a new Python interpreter per request; it does not flush the OS page cache.
+
+## Measured WSL reference
+
+Two real WSL machines were measured at alpha.16 before the alpha.17 E2E/startup work:
+
+| 100k memories | PC-01 | PC-02 |
+| --- | ---: | ---: |
+| Warm NO_RECALL p50 | 16.32 ms | 20.15 ms |
+| Warm Resume p50 | 24.29 ms | 35.18 ms |
+| Warm Handoff p50 | 22.30 ms | 34.56 ms |
+| Fresh Resume p50 | 89.34 ms | 218.23 ms |
+| Fresh Handoff p50 | 90.90 ms | 233.70 ms |
+| Codex hook p50 | 118.03 ms | 248.51 ms |
+
+The key scale result is that archive size increased 100x from 1k to 100k while warm resume/handoff rose only about 1.5x on both machines. Fresh-process differences were dominated by machine/process startup rather than FTS scaling.
+
+## Startup diagnosis
+
+A dedicated startup benchmark showed on GitHub Actions (Python 3.12.14):
+
+| Phase | p50 |
+| --- | ---: |
+| empty Python process | 11.08 ms |
+| import `sqlite3` | 16.52 ms |
+| import compatibility session adapter | 34.70 ms |
+| import hook command | 70.99 ms |
+| build continuity after imports | 0.67 ms |
+| Git inspect after imports | 8.93 ms |
+| scope-index check after imports | 0.60 ms |
+
+This isolates the main fresh-process cost to Python/import startup rather than continuity composition or FTS maintenance.
+
+Two bounded optimizations were tested: separating SessionStart from prompt-only FTS migration, and separating a lightweight SessionStart protocol from the compatibility dataclass/Enum adapter. They improved structural isolation but did **not** produce a repeatable fresh-process wall-time win on hosted runners, so alpha.17 deliberately avoids adding a more duplicated daemon/fast-path architecture without stronger evidence.
+
+Detailed record: [alpha.17 continuity E2E + startup diagnosis](docs/continuity-e2e-startup-alpha17.md).
+
+## Real Git multi-worktree validation
+
+CI now creates actual Git worktrees and verifies:
+
+- shared repository memory is visible in each worktree;
+- worktree-scoped state does not leak across worktrees;
+- checkpoints are separate per worktree;
+- a HEAD change in one worktree marks only that worktree stale;
+- stale `project_state` receives a revalidation warning.
 
 ## Memory governance
 
-A memory claim and evidence are separate concepts:
+Memory claims and evidence are separate:
 
 ```text
 Memory
@@ -285,38 +234,40 @@ Default local data directory:
 
 Compatibility storage/governance commands remain available in `scripts/memory_hub.py`.
 
-## v0.2.0-alpha.16 status
+## v0.2.0-alpha.17 status
 
 Implemented and tested:
 
-- governed Memory/Evidence/raw-source groundwork
-- canonical repository/worktree/branch/HEAD identity
-- repository-qualified scope isolation
-- deterministic Continuity Gate and bounded projector
-- conflict/review/stale-HEAD warnings
-- Codex / Claude / Gemini SessionStart adapters
-- npx install/status/uninstall with persistent runtime
-- npx practical machine benchmark with WSL/toolchain/filesystem metadata
-- warm core + fresh-process + real hook p50/p95 reporting
-- fail-open hooks
-- 1k / 10k / 50k / 100k p50/p95 benchmark harnesses
-- scope-first FTS ordered-result parity at every measured tier
-- production single-index `memory_fts(id, statement, scope_key)` reader
-- non-destructive legacy FTS migration
-- dirty-row insert/update/delete synchronization for compatibility writers
-- broad/LIKE fallback when scoped FTS is unavailable
-- Python 3.10/3.12/3.13 and Node installer/benchmark CI
+- governed Memory/Evidence/raw-source groundwork;
+- canonical repository/worktree/branch/HEAD identity;
+- repository-qualified scope isolation;
+- deterministic continuity gate and bounded projector;
+- production single-index scope-first FTS with non-destructive migration;
+- Codex / Claude / Gemini SessionStart adapters and fail-open hook behavior;
+- persisted last-agent checkpoint and automatic Codex → Claude → Gemini HANDOFF selection;
+- real Git multi-worktree isolation/resume/stale-HEAD E2E;
+- WSL/toolchain/filesystem practical benchmark;
+- fresh-process startup/import/composition breakdown;
+- Python 3.10 / 3.12 / 3.13 and Node CI;
+- ordered-result parity / scale benchmark artifacts.
+
+## Performance records
+
+- [First 1k/10k baseline](docs/baseline-alpha11.md)
+- [1k–100k scale + phase breakdown](docs/baseline-alpha12-scale.md)
+- [Two-index scope-first A/B](docs/scope-first-fts-ab-alpha13.md)
+- [Single-index three-way + production adoption](docs/scope-first-single-index-alpha15.md)
+- [Continuity E2E + startup diagnosis](docs/continuity-e2e-startup-alpha17.md)
+- [Benchmark plan](docs/benchmark-plan.md)
 
 ## Next work
 
-Development remains driven by practical usage rather than feature parity:
+Development remains driven by practical usage:
 
-1. collect and compare the alpha.16 benchmark on the normal WSL development machine;
-2. add persisted Codex → Claude → Gemini handoff end-to-end fixtures;
-3. add real Git multi-worktree end-to-end fixtures for isolation, resume, and stale-HEAD behavior;
-4. add meaningful-event capture only after continuity read behavior remains stable in real use;
-5. optimize SessionStart scope browse only if real WSL measurements justify it;
-6. add semantic fallback/MCP only where measured workflows justify them.
+1. use alpha.17 in normal Codex / Claude / Gemini workflows and collect real handoff failures rather than inventing more memory features;
+2. add meaningful-event capture only after durable-write policy is proven against real usage;
+3. optimize SessionStart further only if repeated WSL startup breakdowns show a stable, actionable target;
+4. add semantic fallback/MCP only where measured workflows justify them.
 
 `worktree-context` migration/archive work is intentionally outside the current `agent-memory-hub` plan.
 
