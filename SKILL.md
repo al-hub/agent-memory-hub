@@ -9,10 +9,10 @@ Use `agent-memory-hub` as a shared, agent-independent L2 memory and continuity l
 
 ## Installation
 
-Preferred setup is the one-command npx installer:
+Preferred setup is the one-command npx installer. npm 12+ disables Git-backed package fetches by default, so the GitHub-backed form opts in per command:
 
 ```bash
-npx -y github:al-hub/agent-memory-hub install
+npx --allow-git=all -y github:al-hub/agent-memory-hub install
 ```
 
 It installs this Agent Skill globally, copies a persistent runtime to `~/.agent-memory-hub/runtime`, initializes the local store, and non-destructively merges SessionStart hooks for Codex, Claude Code, and Gemini CLI.
@@ -26,7 +26,7 @@ npx -y @al-hub/agent-memory-hub@latest install
 Remove managed hooks/runtime/skill while preserving memory data with:
 
 ```bash
-npx -y github:al-hub/agent-memory-hub uninstall
+npx --allow-git=all -y github:al-hub/agent-memory-hub uninstall
 ```
 
 ## Core model
@@ -180,7 +180,7 @@ python3 ~/.agent-memory-hub/runtime/scripts/memory_hub.py status
 For practical local/WSL latency diagnostics use the packaged npx command rather than inventing a separate benchmark:
 
 ```bash
-npx -y github:al-hub/agent-memory-hub benchmark
+npx --allow-git=all -y github:al-hub/agent-memory-hub benchmark
 ```
 
 Use `--quick` for a smoke measurement. The full benchmark records WSL/toolchain/filesystem metadata, warm in-process continuity, fresh-process NO_RECALL/Resume/Handoff, real SessionStart hook p50/p95, and writes `agent-memory-hub-benchmark.json` by default. Fresh-process measurements do not claim to flush the OS page cache.
