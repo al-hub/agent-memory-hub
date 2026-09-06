@@ -13,7 +13,7 @@ class SQLiteMemoryReader:
     """Fast local retrieval using scope/type filters before lexical ranking."""
 
     def __init__(self, db_path: str | Path, scope_resolver: ScopeResolver | None = None):
-        self._db_path = str(db_path)
+        self._db_path = Path(db_path)
         self._scope_resolver = scope_resolver or ScopeResolver()
 
     def _terms(self, text: str) -> list[str]:
@@ -21,7 +21,7 @@ class SQLiteMemoryReader:
 
     def recall(self, query: RecallQuery) -> list[MemoryCandidate]:
         terms = self._terms(query.text)
-        if not terms:
+        if not terms or not self._db_path.exists():
             return []
 
         resolved = self._scope_resolver.resolve(query.context)
@@ -31,6 +31,15 @@ class SQLiteMemoryReader:
         con = sqlite3.connect(self._db_path)
         con.row_factory = sqlite3.Row
         try:
+            try:
+                table_exists = con.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='memories'"
+                ).fetchone()
+            except sqlite3.OperationalError:
+                return []
+            if not table_exists:
+                return []
+
             scope_sql = []
             scope_params: list[object] = []
             rank_case = []
@@ -83,10 +92,13 @@ class SQLiteMemoryReader:
                     ORDER BY scope_rank ASC, m.confidence DESC, m.updated_at DESC
                     LIMIT ?
                 """
-                rows = con.execute(
-                    sql,
-                    [*rank_params, *[f"%{t}%" for t in terms], *params, limit],
-                ).fetchall()
+                try:
+                    rows = con.execute(
+                        sql,
+                        [*rank_params, *[f"%{t}%" for t in terms], *params, limit],
+                    ).fetchall()
+                except sqlite3.OperationalError:
+                    return []
 
             return [
                 MemoryCandidate(
