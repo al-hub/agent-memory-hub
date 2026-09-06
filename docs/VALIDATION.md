@@ -1,7 +1,6 @@
-# Memcarry 리브랜딩 검증
+# Memcarry 검증 기록
 
-이 문서는 `al-hub/agent-memory-hub`에서 `al-hub/memcarry`로 이름을 바꾼 뒤,
-기존 동작을 보존했는지 확인한 기록이다.
+이 문서는 현재 `al-hub/memcarry` 배포물의 동작·문서·성능 계약을 확인한 기록이다.
 
 ## 범위
 
@@ -9,7 +8,7 @@
 - 변경 버전: `0.2.0-alpha.18`
 - 검증 대상: Python 도메인/통합 테스트, Node 설치기 테스트, CLI smoke,
   startup/continuity benchmark
-- worktree 기능 자체는 이번 변경 범위에서 제외하지 않고, 기존 격리 테스트가
+- worktree 세부 운영은 사용자 시나리오에서 제외했지만, 기존 격리 테스트가
   계속 통과하는지만 회귀 검증했다.
 
 ## 동작 검증
@@ -32,7 +31,6 @@ hook 정확 매칭)를 추가했다.
 - AGY native `PreInvocation` plugin hook의 bounded context 주입
 - Codex/Claude/Gemini hook 설치·status·uninstall의 멱등성
 - 같은 hook 그룹의 무관한 hook 보존
-- 기존 `agent-memory-hub` hook은 정확히 일치하는 경우에만 선택적으로 교체
 - SQLite schema/migration, recall, resume/handoff, clone-resume, stale HEAD
   및 실제 multi-worktree isolation
 
@@ -63,9 +61,6 @@ ordered 결과와 continuity mode 결과는 테스트에서 동일하게 유지�
 
 ## 이름·호환성 원칙
 
-- 새 문서와 설치 명령은 `memcarry`를 사용한다.
-- 기존 al-hub 사용자는 마이그레이션 문서의 `--home` 지정으로 기존 데이터를
-  명시적으로 재사용할 수 있다.
-- 구 외부 프로젝트 `liuyang0508/Agent-Memory-Hub` 및 unscoped npm
-  `agent-memory-hub`와 혼동하지 않는다.
-- 구 Python 저장기 경로 `scripts/memory_hub.py`는 얇은 호환 shim으로 남긴다.
+- 새 문서·설치 명령·skill은 `memcarry`를 사용한다.
+- 기존 사용자는 마이그레이션 문서의 명시적 `--home` 지정으로 데이터를 재사용할 수 있다.
+- 호환 shim과 legacy hook 식별자는 기존 데이터·설정을 안전하게 이어가기 위한 내부 경계에만 남긴다.

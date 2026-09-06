@@ -1,15 +1,15 @@
-# Memcarry 이름 전환 안내
+# Memcarry 기존 설치 전환 안내
 
-이 프로젝트는 `al-hub/agent-memory-hub`에서 `al-hub/memcarry`로 이름이 바뀌었다.
-별도 프로젝트인 `liuyang0508/Agent-Memory-Hub` 및 unscoped npm 패키지 `agent-memory-hub`와 혼동하지 않는다.
-이 문서는 **al-hub의 기존 설치**를 대상으로 한다. 타 프로젝트 데이터는 호환된다고 가정하지 않는다.
+이 문서는 이전 al-hub 설치를 현재 `al-hub/memcarry` runtime으로 전환할 때만 사용한다.
+저장소를 자동 이동·합치기·삭제하지 않으며, 다른 도구의 데이터는 호환된다고 가정하지 않는다.
 
 | 구분 | 이전 | 현재 |
 | --- | --- | --- |
-| 제품·skill | Agent Memory Hub / `agent-memory-hub` | Memcarry / `memcarry` |
-| GitHub | `al-hub/agent-memory-hub` | `al-hub/memcarry` |
-| npm 이름 | `@al-hub/agent-memory-hub` | `@al-hub/memcarry` (공개 전) |
-| 패키지 CLI | `agent-memory-hub` | `memcarry` |
+| 구분 | 이전 설치 식별자 | 현재 |
+| 제품·skill | 이전 skill 이름 | Memcarry / `memcarry` |
+| GitHub | 이전 al-hub 저장소 | `al-hub/memcarry` |
+| npm 이름 | 이전 scoped 이름 | `@al-hub/memcarry` (공개 전) |
+| 패키지 CLI | 이전 CLI | `memcarry` |
 | 기본 저장 경로 | `~/.agent-memory-hub` | `~/.memcarry` |
 | 환경변수 | `AGENT_MEMORY_HUB_HOME` | `MEMCARRY_HOME` (이전 변수도 fallback 지원) |
 | Python 패키지 | `agent_memory_hub` | `memcarry` |
@@ -46,11 +46,12 @@ Node 경로 옵션·환경변수는 절대 경로를 권장한다. 셸의 따옴
 
 ## 옛 skill 정리
 
-새 skill을 설치하고 정상 동작을 확인한 다음, 옛 `agent-memory-hub` skill의 출처가 al-hub인지 확인한다.
-확인된 옛 skill만 명시적으로 제거한다:
+새 skill을 설치하고 정상 동작을 확인한 다음, 이전 skill의 출처가 al-hub인지 확인한다.
+확인된 이전 skill만 명시적으로 제거한다:
 
 ```bash
-npx -y skills@latest remove agent-memory-hub -g -y
+OLD_SKILL_NAME="<이전 skill 이름>"
+npx -y skills@latest remove "$OLD_SKILL_NAME" -g -y
 ```
 
 새 installer는 출처가 불명확한 동일 이름의 skill을 자동 삭제하지 않는다.
@@ -68,7 +69,7 @@ origin을 새 URL로 바꾸거나 새 URL로 clone하면 ID가 달라지므로 �
 
 - SQLite 스키마·기억 ID·scope 인코딩·checkpoint 형식·검색/판정 알고리즘은 개명으로 바꾸지 않는다.
 - 외부 Python 사용자는 import를 `memcarry`로 변경한다. 옛 Python 패키지 import alias는 제공하지 않는다.
-- unscoped `agent-memory-hub` 실행 파일 alias는 만들지 않는다. 외부 프로젝트와 충돌을 피하기 위함이다.
+- 이전 CLI 실행 파일 alias는 만들지 않는다. 이름 충돌과 오작동을 피하기 위함이다.
 - benchmark 식별자와 기본 출력 파일명이 `memcarry`로 바뀐다. 과거 수치는 재측정 결과가 아니다.
 - uninstall은 선택한 runtime과 관리 hook/skill을 정리하지만 기억 DB·raw·events·checkpoint는 남긴다.
 

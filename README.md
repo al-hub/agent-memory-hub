@@ -4,14 +4,13 @@
 
 Current development baseline: **v0.2.0-alpha.18**
 
-[실전 사용 시나리오](docs/USAGE-SCENARIOS.md) · [기존 설치 전환](docs/MIGRATION-MEMCARRY.md) · [변경 전후 검증](docs/REBRAND-VALIDATION.md)
+[실전 사용 시나리오](docs/USAGE-SCENARIOS.md) · [기존 설치 전환](docs/MIGRATION-MEMCARRY.md) · [검증 기록](docs/VALIDATION.md)
 
 `memcarry` is a local-first shared L2 memory and continuity layer for AI coding agents. It is specialized for practical coding workflows: fast resume, repository/worktree/HEAD correctness, bounded context, persisted cross-agent handoff, and minimal manual memory commands.
 
 Raw evidence is canonical. Governed memories and summaries are rebuildable indexes/projections over that evidence.
 
-Memcarry means **Memory + Carry**: keep useful decisions, evidence, and progress, then carry relevant context into the next task.
-It is the renamed `al-hub/agent-memory-hub`, not the separately maintained `liuyang0508/Agent-Memory-Hub` or its unscoped npm package.
+Memcarry means **Memory + Carry**: keep useful decisions, evidence, and progress, then carry relevant context into the next task. It is an independent local-first continuity layer with its own scoped package and CLI identity.
 
 ## One-command install
 
@@ -42,7 +41,7 @@ npx -y @al-hub/memcarry@latest install
 
 The installer copies a stable runtime to `~/.memcarry/runtime`, initializes the local store, and configures Codex / Claude / Gemini SessionStart hooks plus an Antigravity CLI (`agy`) plugin without replacing unrelated settings. Memory data survives runtime upgrades/uninstall.
 
-Existing al-hub users: explicitly reuse your old store with `install --home "$HOME/.agent-memory-hub"`; see the migration guide before removing an old skill. No legacy data is silently moved or merged.
+Existing installations: see the migration guide before changing the storage path. No legacy data is silently moved, merged, or deleted.
 
 ## Target experience
 

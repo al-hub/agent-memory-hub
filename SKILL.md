@@ -22,7 +22,7 @@ npx --allow-git=all -y github:al-hub/memcarry install
 The installer copies a persistent runtime to `~/.memcarry/runtime`, initializes the local store, and non-destructively configures Codex, Claude Code, and Gemini CLI SessionStart hooks plus the Antigravity CLI (`agy`) plugin.
 
 Examples below use the default home. With a custom home, use that runtime path and pass `--home` to scripts or set `MEMCARRY_HOME`.
-Installed hooks explicitly bind the configured store. `AGENT_MEMORY_HUB_HOME` is retained as an environment fallback.
+Installed hooks explicitly bind the configured store. A legacy environment fallback exists only for migration compatibility; new setups should use `MEMCARRY_HOME`.
 
 After the scoped npm package is published, the intended form is:
 
