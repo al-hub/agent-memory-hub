@@ -2,7 +2,7 @@
 
 **One trusted memory for every AI agent.**
 
-Current development baseline: **v0.2.0-alpha.7**
+Current development baseline: **v0.2.0-alpha.8**
 
 `agent-memory-hub` is a local-first L2 memory and continuity layer for coding agents and LLM CLIs. It imports accessible L1 memory from each agent, keeps provenance and review status, detects duplicate/conflicting memories, and returns only a small relevant context pack when an agent needs past context.
 
@@ -59,7 +59,7 @@ FTS5/BM25 fast recall
   ↓
 governance filter
   ↓
-token-budget context projection
+HEAD-aware bounded context projection
   ↓
 agent continues work
 ```
@@ -80,7 +80,7 @@ The original implementation is intentionally small and dependency-free (Python s
 - import adapters for common text-based L1 files
 - doctor/status commands
 
-### v0.2.0-alpha.7 — seamless continuity state baseline
+### v0.2.0-alpha.8 — HEAD-aware continuity projection baseline
 
 The v0.2 architecture is documented before full implementation:
 
@@ -112,15 +112,18 @@ Implemented groundwork includes:
 - SQLite repository-family knowledge detection across repository/branch/worktree/task scopes
 - tiny JSON continuity checkpoint store keyed by repository + worktree
 - `SeamlessContinuityService` that executes State Detection → Gate → Recall → Projection without manual continuity flags
-- CI coverage for legacy CLI behavior, package unit tests, Git tests, SQLite integration tests, continuity gate/projector/composition tests, and state adapter tests
+- stale HEAD propagation from state detection into projection
+- HEAD-sensitive `project_state` memories are demoted when HEAD changed and rendered with an explicit `STALE_HEAD` revalidation warning
+- stable memories such as decisions and constraints remain usable across HEAD changes unless independently stale/conflicted
+- CI coverage for legacy CLI behavior, package unit tests, Git tests, SQLite integration tests, continuity gate/projector/composition tests, state adapter tests, and stale-HEAD projection tests
 
 Next continuity work proceeds test-first:
 
-1. surface stale-HEAD warnings into resume/worktree context packs
-2. connect seamless continuity to compatibility CLI/agent entry points
-3. add concrete session-id/context adapters for Codex/Claude/Gemini where available
+1. connect seamless continuity to compatibility CLI/agent entry points
+2. add concrete session-id/context adapters for Codex/Claude/Gemini where available
+3. add end-to-end onboarding/resume/handoff continuity scenarios
 4. add measured token/latency regression fixtures
-5. add end-to-end onboarding/resume/handoff continuity scenarios
+5. harden stale classification beyond `project_state` with evidence/time-aware rules
 
 ## Install as an Agent Skill
 
@@ -265,13 +268,10 @@ Codex
   → repository/worktree scoped FTS5 recall
   → governed, deduplicated, token-budgeted context projection
 
-Context pack:
-- current task and next action
-- verified architectural decisions
-- active constraints
-- relevant failures/lessons
-- unresolved conflicts clearly marked as warnings
-- stale HEAD/checkpoint state surfaced when applicable
+If HEAD changed since the stored checkpoint:
+- verified decisions/constraints remain available
+- volatile project_state is moved behind stable context
+- project_state is marked STALE_HEAD and must be revalidated against current code
 ```
 
 If two memories disagree, the hub surfaces the conflict rather than inventing a winner.
@@ -288,8 +288,8 @@ Implementation order for v0.2:
 6. token-budget Context Projector
 7. composed ContinuityContextService
 8. seamless continuity state detection
-9. onboarding/resume/handoff/worktree continuity presets
-10. HEAD-aware stale warnings
+9. HEAD-aware stale projection
+10. onboarding/resume/handoff/worktree continuity presets
 11. compatibility CLI + agent entry points
 12. concrete per-agent session adapters and thin projections
 13. cold-source index + lazy extraction interfaces
