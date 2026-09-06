@@ -12,7 +12,10 @@ from agent_memory_hub.domain.continuity_state import ContinuityObservation
 from agent_memory_hub.infrastructure.filesystem.continuity_state_store import JsonContinuityStateStore
 from agent_memory_hub.infrastructure.git.repository_inspector import GitRepositoryInspector
 from agent_memory_hub.infrastructure.sqlite.repository_knowledge import SQLiteRepositoryKnowledgeReader
-from agent_memory_hub.infrastructure.sqlite.retriever import SQLiteMemoryReader
+from agent_memory_hub.infrastructure.sqlite.scope_index import ensure_single_index_scope_fts
+from agent_memory_hub.infrastructure.sqlite.single_index_scope_retriever import (
+    SingleIndexScopeSQLiteMemoryReader,
+)
 
 
 class ContinuityCommand:
@@ -112,7 +115,10 @@ def build_continuity_command(home: str | Path, *, token_budget: int = 1000) -> C
     db_path = home / "memory.db"
     state_path = home / "continuity-state.json"
 
-    memory_reader = SQLiteMemoryReader(db_path)
+    # Index migration is rebuildable and fail-safe. Existing/missing stores remain
+    # readable through the single-index reader's broad/LIKE fallback.
+    ensure_single_index_scope_fts(db_path)
+    memory_reader = SingleIndexScopeSQLiteMemoryReader(db_path)
     knowledge_reader = SQLiteRepositoryKnowledgeReader(db_path)
     state_store = JsonContinuityStateStore(state_path)
     state_detector = ContinuityStateDetector(knowledge_reader, state_store)
