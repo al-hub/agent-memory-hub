@@ -29,7 +29,6 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from agent_memory_hub.cli.continuity import build_continuity_command  # noqa: E402
-from agent_memory_hub.cli.hook_command import SessionStartHookCommand  # noqa: E402
 from agent_memory_hub.infrastructure.filesystem.continuity_state_store import JsonContinuityStateStore  # noqa: E402
 from agent_memory_hub.infrastructure.git.repository_inspector import GitRepositoryInspector  # noqa: E402
 from agent_memory_hub.ports.continuity_state import StoredContinuityState  # noqa: E402
@@ -164,12 +163,16 @@ def create_database(db_path: Path, context, memory_count: int) -> None:
     con.close()
 
 
-def measure(fn, *, warmup: int, iterations: int) -> tuple[list[float], object]:
+def measure(fn, *, warmup: int, iterations: int, before_each=None) -> tuple[list[float], object]:
     last = None
     for _ in range(warmup):
+        if before_each:
+            before_each()
         last = fn()
     timings: list[float] = []
     for _ in range(iterations):
+        if before_each:
+            before_each()
         started = time.perf_counter_ns()
         last = fn()
         timings.append((time.perf_counter_ns() - started) / 1_000_000.0)
@@ -213,32 +216,57 @@ def benchmark_tier(memory_count: int, *, warmup: int, iterations: int, subproces
                 json_output=True,
             )
 
+        def checkpoint(session_id: str | None, head_sha: str):
+            state_store.save(
+                repo_id,
+                worktree_id,
+                StoredContinuityState(session_id=session_id, head_sha=head_sha),
+            )
+
         cases = {
-            "no_recall": lambda: command_case("rename local variable", session_id="bench-steady"),
-            "resume_prompt": lambda: command_case("continue architecture implementation", session_id="bench-steady"),
-            "handoff_prompt": lambda: command_case("Claude continue architecture implementation", session_id="bench-steady"),
-            "session_start_onboarding": lambda: command_case("", session_id="bench-startup", has_context=False, source="startup"),
-            "session_start_resume": lambda: command_case("", session_id="bench-resume", has_context=True, source="resume"),
+            "no_recall": (
+                lambda: command_case("rename local variable", session_id="bench-steady"),
+                lambda: checkpoint("bench-steady", head1),
+            ),
+            "resume_prompt": (
+                lambda: command_case("continue architecture implementation", session_id="bench-steady"),
+                lambda: checkpoint("bench-steady", head1),
+            ),
+            "handoff_prompt": (
+                lambda: command_case("Claude continue architecture implementation", session_id="bench-steady"),
+                lambda: checkpoint("bench-steady", head1),
+            ),
+            "session_start_onboarding": (
+                lambda: command_case("", session_id="bench-startup", has_context=False, source="startup"),
+                lambda: checkpoint(None, head1),
+            ),
+            "session_start_resume": (
+                lambda: command_case("", session_id="bench-resume", has_context=True, source="resume"),
+                lambda: checkpoint("bench-resume", head1),
+            ),
         }
 
-        for name, fn in cases.items():
-            timings, last = measure(fn, warmup=warmup, iterations=iterations)
+        for name, (fn, prepare) in cases.items():
+            timings, last = measure(
+                fn,
+                warmup=warmup,
+                iterations=iterations,
+                before_each=prepare,
+            )
             scenarios[name] = {**summarize_ms(timings), **payload_meta(last)}
 
         # Make HEAD stale, then restore the old checkpoint before every timed call.
         (repo / "CHANGE.md").write_text("new head\n", encoding="utf-8")
         run_git("add", "CHANGE.md", cwd=repo)
         run_git("commit", "-m", "advance head", cwd=repo)
+        head2 = run_git("rev-parse", "HEAD", cwd=repo)
 
-        def stale_case():
-            state_store.save(
-                repo_id,
-                worktree_id,
-                StoredContinuityState(session_id="bench-stale", head_sha=head1),
-            )
-            return command_case("", session_id="bench-stale", has_context=True, source="resume")
-
-        stale_timings, stale_last = measure(stale_case, warmup=warmup, iterations=iterations)
+        stale_timings, stale_last = measure(
+            lambda: command_case("", session_id="bench-stale", has_context=True, source="resume"),
+            warmup=warmup,
+            iterations=iterations,
+            before_each=lambda: checkpoint("bench-stale", head1),
+        )
         scenarios["stale_head_resume"] = {**summarize_ms(stale_timings), **payload_meta(stale_last)}
 
         def hook_case(agent: str, source: str, session_id: str):
@@ -264,15 +292,17 @@ def benchmark_tier(memory_count: int, *, warmup: int, iterations: int, subproces
                 raise RuntimeError(result.stderr or result.stdout)
             return result.stdout.strip()
 
-        for name, agent, source in (
-            ("hook_codex_resume", "codex", "resume"),
-            ("hook_claude_clear", "claude", "clear"),
-            ("hook_gemini_startup", "gemini", "startup"),
-        ):
+        hook_cases = (
+            ("hook_codex_resume", "codex", "resume", "hook-codex", "hook-codex"),
+            ("hook_claude_clear", "claude", "clear", "hook-claude", "hook-claude"),
+            ("hook_gemini_startup", "gemini", "startup", "hook-gemini", None),
+        )
+        for name, agent, source, session_id, prior_session in hook_cases:
             timings, last = measure(
-                lambda a=agent, s=source, n=name: hook_case(a, s, f"{n}-steady"),
+                lambda a=agent, s=source, sid=session_id: hook_case(a, s, sid),
                 warmup=min(warmup, 2),
                 iterations=subprocess_iterations,
+                before_each=lambda sid=prior_session: checkpoint(sid, head2),
             )
             hook_output = json.loads(last)
             additional = (hook_output.get("hookSpecificOutput") or {}).get("additionalContext", "")
