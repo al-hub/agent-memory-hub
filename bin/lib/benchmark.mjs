@@ -56,7 +56,7 @@ export function runBenchmark({ packageRoot, memoryHome, rawOptions = {}, cwd = p
   console.log(`tiers: ${config.sizes}`);
   console.log(`python: ${python}`);
   console.log(`memory-home filesystem target: ${memoryHome}`);
-  console.log('measurement: warm in-process core + fresh-process continuity + real SessionStart hooks');
+  console.log('measurement: warm in-process core + fresh-process continuity + real SessionStart/AGY PreInvocation hooks');
 
   const result = spawnSync(python, buildBenchmarkArgs(packageRoot, config), {
     cwd,

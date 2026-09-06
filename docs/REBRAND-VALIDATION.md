@@ -29,6 +29,7 @@ hook 정확 매칭)를 추가했다.
 
 - `memcarry` 패키지/CLI와 `~/.memcarry` 기본 경로
 - `MEMCARRY_HOME` 우선순위와 설치된 hook의 명시적 `--home` 전달
+- AGY native `PreInvocation` plugin hook의 bounded context 주입
 - Codex/Claude/Gemini hook 설치·status·uninstall의 멱등성
 - 같은 hook 그룹의 무관한 hook 보존
 - 기존 `agent-memory-hub` hook은 정확히 일치하는 경우에만 선택적으로 교체

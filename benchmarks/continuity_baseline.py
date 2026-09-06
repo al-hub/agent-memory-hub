@@ -40,6 +40,7 @@ from memcarry.infrastructure.sqlite.retriever import SQLiteMemoryReader  # noqa:
 from memcarry.ports.continuity_state import StoredContinuityState  # noqa: E402
 
 HOOK_SCRIPT = ROOT / "scripts" / "session_start_hook.py"
+ANTIGRAVITY_HOOK_SCRIPT = ROOT / "scripts" / "antigravity_hook.py"
 
 
 def percentile(values: list[float], q: float) -> float:
@@ -349,6 +350,28 @@ def benchmark_tier(memory_count: int, *, warmup: int, iterations: int, subproces
                 raise RuntimeError(result.stderr or result.stdout)
             return result.stdout.strip()
 
+        def antigravity_hook_case(session_id: str):
+            payload = json.dumps(
+                {
+                    "conversationId": session_id,
+                    "workspacePaths": [str(repo)],
+                    "invocationNum": 0,
+                }
+            )
+            env = os.environ.copy()
+            env["MEMCARRY_HOME"] = str(home)
+            result = subprocess.run(
+                [sys.executable, str(ANTIGRAVITY_HOOK_SCRIPT), "--home", str(home), "--event", "pre-invocation"],
+                input=payload,
+                text=True,
+                capture_output=True,
+                env=env,
+                check=False,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr or result.stdout)
+            return result.stdout.strip()
+
         hook_cases = (
             ("hook_codex_resume", "codex", "resume", "hook-codex", "hook-codex"),
             ("hook_claude_clear", "claude", "clear", "hook-claude", "hook-claude"),
@@ -367,6 +390,24 @@ def benchmark_tier(memory_count: int, *, warmup: int, iterations: int, subproces
                 **summarize_ms(timings),
                 "additional_context_bytes": len(additional.encode("utf-8")),
             }
+
+        timings, last = measure(
+            lambda: antigravity_hook_case("hook-agy"),
+            warmup=min(warmup, 2),
+            iterations=subprocess_iterations,
+            before_each=lambda: checkpoint("hook-agy", head2),
+        )
+        agy_output = json.loads(last)
+        injected = agy_output.get("injectSteps") or []
+        context = "\n".join(
+            step.get("ephemeralMessage", "")
+            for step in injected
+            if isinstance(step, dict)
+        )
+        scenarios["hook_agy_pre_invocation"] = {
+            **summarize_ms(timings),
+            "additional_context_bytes": len(context.encode("utf-8")),
+        }
 
         return {
             "memory_count": memory_count,

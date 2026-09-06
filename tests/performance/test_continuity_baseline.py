@@ -46,6 +46,7 @@ class ContinuityBaselineHarnessTest(unittest.TestCase):
             "hook_codex_resume",
             "hook_claude_clear",
             "hook_gemini_startup",
+            "hook_agy_pre_invocation",
         }
         self.assertEqual(set(scenarios), expected)
         self.assertEqual(scenarios["no_recall"]["mode"], "no_recall")

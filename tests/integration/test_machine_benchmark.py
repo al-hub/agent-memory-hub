@@ -45,6 +45,8 @@ class MachineBenchmarkIntegrationTest(unittest.TestCase):
             self.assertIn("process_cold", tier)
             self.assertIn("resume_prompt", tier["process_cold"])
             self.assertIn("p50_ms", tier["process_cold"]["resume_prompt"])
+            self.assertIn("hook_agy_pre_invocation", tier["scenarios"])
+            self.assertIn("p50_ms", tier["scenarios"]["hook_agy_pre_invocation"])
             self.assertIn("Startup/process breakdown", result.stdout)
             self.assertIn("JSON:", result.stdout)
 

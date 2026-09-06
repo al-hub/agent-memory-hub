@@ -146,7 +146,7 @@ It records:
 - Python / Node / Git / SQLite / FTS5 versions;
 - warm in-process NO_RECALL / Resume / Handoff;
 - fresh-process NO_RECALL / Resume / Handoff;
-- real Codex / Claude / Gemini SessionStart hook latency;
+- real Codex / Claude / Gemini SessionStart and AGY PreInvocation hook latency;
 - startup/import/composition phase breakdown;
 - p50 / p95 and a JSON report.
 

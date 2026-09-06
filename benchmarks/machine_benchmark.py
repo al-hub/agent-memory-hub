@@ -267,7 +267,7 @@ def print_summary(report: dict, output: Path) -> None:
     print_startup_breakdown(report["startup_breakdown"])
     print("\nPractical latency summary (p50/p95 ms)")
     print("  warm = in-process after warmup; fresh = new Python process each request")
-    print("  memories | warm no-recall | fresh no-recall | warm resume | fresh resume | warm handoff | fresh handoff | codex hook")
+    print("  memories | warm no-recall | fresh no-recall | warm resume | fresh resume | warm handoff | fresh handoff | codex hook | agy hook")
     for tier in report["tiers"]:
         scenarios = tier["scenarios"]
         cold = tier["process_cold"]
@@ -279,7 +279,8 @@ def print_summary(report: dict, output: Path) -> None:
             f" {latency_pair(cold['resume_prompt']):>12s} |"
             f" {latency_pair(scenarios['handoff_prompt']):>12s} |"
             f" {latency_pair(cold['handoff_prompt']):>13s} |"
-            f" {latency_pair(scenarios['hook_codex_resume']):>10s}"
+            f" {latency_pair(scenarios['hook_codex_resume']):>10s} |"
+            f" {latency_pair(scenarios['hook_agy_pre_invocation']):>9s}"
         )
     print("\nNotes")
     print("  - fresh-process does not flush the OS page cache; it isolates Python/import/composition startup.")
