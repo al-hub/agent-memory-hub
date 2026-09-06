@@ -47,6 +47,46 @@ class ContinuityGateTest(unittest.TestCase):
         ))
         self.assertEqual(decision.mode, ContinuityMode.RESUME)
 
+    def test_session_start_resume_source_triggers_resume_without_wording(self):
+        decision = self.gate.decide(ContinuityRequest(
+            "",
+            self.context,
+            repository_known=True,
+            session_has_context=True,
+            session_source="resume",
+        ))
+        self.assertEqual(decision.mode, ContinuityMode.RESUME)
+
+    def test_session_start_clear_source_triggers_resume_even_if_session_id_did_not_change(self):
+        decision = self.gate.decide(ContinuityRequest(
+            "",
+            self.context,
+            repository_known=True,
+            session_has_context=False,
+            session_source="clear",
+        ))
+        self.assertEqual(decision.mode, ContinuityMode.RESUME)
+
+    def test_session_start_compact_source_refreshes_resume_context(self):
+        decision = self.gate.decide(ContinuityRequest(
+            "",
+            self.context,
+            repository_known=True,
+            session_has_context=True,
+            session_source="compact",
+        ))
+        self.assertEqual(decision.mode, ContinuityMode.RESUME)
+
+    def test_startup_source_on_known_repo_with_empty_session_onboards(self):
+        decision = self.gate.decide(ContinuityRequest(
+            "",
+            self.context,
+            repository_known=True,
+            session_has_context=False,
+            session_source="startup",
+        ))
+        self.assertEqual(decision.mode, ContinuityMode.ONBOARDING)
+
     def test_explicit_past_decision_question_triggers_recall(self):
         decision = self.gate.decide(ContinuityRequest("전에 SQLite로 결정했던 이유가 뭐였지?", self.context))
         self.assertEqual(decision.mode, ContinuityMode.RECALL)
