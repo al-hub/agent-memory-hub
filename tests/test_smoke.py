@@ -20,7 +20,16 @@ class MemoryHubSmokeTest(unittest.TestCase):
 
     def run_cli(self, *args, check=True):
         cmd = [sys.executable, str(CLI), "--home", str(self.home), *args]
-        return subprocess.run(cmd, text=True, capture_output=True, check=check)
+        result = subprocess.run(cmd, text=True, capture_output=True, check=False)
+        if check and result.returncode:
+            self.fail(
+                "CLI failed\n"
+                f"command: {' '.join(cmd)}\n"
+                f"returncode: {result.returncode}\n"
+                f"stdout:\n{result.stdout}\n"
+                f"stderr:\n{result.stderr}"
+            )
+        return result
 
     def test_init_add_recall_duplicate_and_doctor(self):
         out = self.run_cli("init").stdout
