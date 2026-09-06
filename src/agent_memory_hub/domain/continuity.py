@@ -23,6 +23,9 @@ class ContinuityRequest:
     session_reset: bool = False
     stale_head: bool = False
     session_source: str | None = None
+    agent_changed: bool = False
+    previous_agent: str | None = None
+    current_agent: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
