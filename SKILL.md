@@ -9,7 +9,6 @@ Use `memcarry` as a shared, agent-independent L2 memory and continuity layer.
 
 Keep useful memory; do not treat stored claims as automatically true. Carry only the context relevant to the current work.
 For concrete user examples read [USAGE-SCENARIOS.md](docs/USAGE-SCENARIOS.md).
-For an existing al-hub installation read [MIGRATION-MEMCARRY.md](docs/MIGRATION-MEMCARRY.md) before changing paths.
 
 ## Installation
 
@@ -22,7 +21,7 @@ npx --allow-git=all -y github:al-hub/memcarry install
 The installer copies a persistent runtime to `~/.memcarry/runtime`, initializes the local store, and non-destructively configures Codex, Claude Code, and Gemini CLI SessionStart hooks plus the Antigravity CLI (`agy`) plugin.
 
 Examples below use the default home. With a custom home, use that runtime path and pass `--home` to scripts or set `MEMCARRY_HOME`.
-Installed hooks explicitly bind the configured store. A legacy environment fallback exists only for migration compatibility; new setups should use `MEMCARRY_HOME`.
+Installed hooks explicitly bind the configured store. New setups should use `MEMCARRY_HOME` only when a custom location is required.
 
 After the scoped npm package is published, the intended form is:
 

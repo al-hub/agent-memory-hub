@@ -2,7 +2,7 @@
 
 > 기억을 많이 쌓는 도구가 아니라, 다음 작업자가 근거를 확인하고 바로 이어가게 하는 continuity skill이다.
 
-이 문서는 worktree를 제외하고, 한 PC에서 Codex·Claude·Gemini·AGY를 번갈아 사용하는 실제 흐름을 다룬다. AGY는 Antigravity CLI의 native `PreInvocation` plugin으로 같은 bounded context를 받는다.
+이 문서는 worktree를 제외하고, 처음 설치한 사용자가 한 PC에서 Codex·Claude·Gemini·AGY를 번갈아 사용하는 실제 흐름을 다룬다. AGY는 Antigravity CLI의 native `PreInvocation` plugin으로 같은 bounded context를 받는다.
 
 ## 먼저 보는 차이
 
