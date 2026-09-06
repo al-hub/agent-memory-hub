@@ -2,7 +2,7 @@
 
 **One trusted memory for every AI agent.**
 
-Current development baseline: **v0.2.0-alpha.11**
+Current development baseline: **v0.2.0-alpha.12**
 
 `agent-memory-hub` is a local-first shared L2 memory and continuity layer for AI coding agents. It is designed so Codex, Claude Code, Gemini CLI, and future agents can continue useful prior work across sessions, repositories, branches, worktrees, and agent switches without making the user restate context.
 
@@ -109,7 +109,7 @@ hook additionalContext / small context pack
 agent continues work
 ```
 
-When continuity is irrelevant, `NO_RECALL` takes a zero-read/zero-project fast path.
+When continuity is irrelevant, `NO_RECALL` skips memory retrieval and projection.
 
 ## Hook-native continuity
 
@@ -132,8 +132,6 @@ fork     → RESUME where supported
 ```
 
 Hook failures are fail-open: memory problems must not prevent the coding agent from starting.
-
-Gemini documents SessionStart hooks as context-injection hooks configured in `~/.gemini/settings.json`; the installer merges its own hook rather than replacing the existing hooks object.
 
 ## Why SessionStart needs scope browse
 
@@ -168,6 +166,43 @@ The local continuity checkpoint stores repository/worktree session and HEAD info
 - stable memories such as verified decisions and constraints remain usable;
 - volatile `project_state` is demoted below stable context;
 - projected volatile state receives an explicit `STALE_HEAD` warning and must be revalidated against current code.
+
+## Practical baseline before specialization
+
+The project keeps its current name and direction. External memory systems are useful as reference baselines, but the goal is not feature-by-feature competition. `agent-memory-hub` will specialize around real coding-agent conditions: startup/resume latency, worktree/HEAD correctness, bounded context, low manual invocation, and safe cross-agent continuity.
+
+The first reproducible baseline measures both the in-process continuity path and the real SessionStart subprocess path. On a GitHub Actions Ubuntu runner with Python 3.12.14:
+
+```text
+1,000 memories
+  NO_RECALL core         p50  6.99 ms
+  resume core            p50  8.19 ms
+  SessionStart resume    p50  6.81 ms
+  Codex hook end-to-end  p50 72.27 ms
+
+10,000 memories
+  NO_RECALL core         p50  6.01 ms
+  resume core            p50 17.07 ms
+  SessionStart resume    p50  8.67 ms
+  Codex hook end-to-end  p50 72.70 ms
+```
+
+The first useful signal is that SessionStart hook latency is currently dominated by process/Git startup rather than archive size, while prompt-based lexical recall is more sensitive to archive growth. Context remained bounded at 8 items for resume/handoff and 12 items for onboarding.
+
+These numbers are a **reference baseline, not a latency promise or CI threshold**. See [docs/baseline-alpha11.md](docs/baseline-alpha11.md) and [docs/benchmark-plan.md](docs/benchmark-plan.md).
+
+Reproduce locally:
+
+```bash
+python3 benchmarks/continuity_baseline.py \
+  --sizes 1000,10000 \
+  --warmup 5 \
+  --iterations 30 \
+  --subprocess-iterations 10 \
+  --output benchmark-results.json
+```
+
+CI records the JSON result as the `continuity-benchmark-baseline` artifact without failing builds on latency values.
 
 ## Memory governance
 
@@ -241,7 +276,7 @@ python3 scripts/memory_hub.py import-l1
 
 The importer only uses sources actually accessible on disk. It never assumes access to private product memory.
 
-## v0.2.0-alpha.11 status
+## v0.2.0-alpha.12 status
 
 Implemented and tested:
 
@@ -262,7 +297,10 @@ Implemented and tested:
 - persistent runtime copy outside the npx cache
 - non-destructive/idempotent hook merge and one-time config backup
 - npx install/status/uninstall integration tests
-- Python CI across 3.10, 3.12, 3.13 plus Node 22 installer CI
+- reproducible practical continuity benchmark harness
+- 1k/10k memory latency, context-size, stale-HEAD, onboarding/resume/handoff and real hook baselines
+- machine-readable benchmark artifact in CI without hard latency gates
+- Python CI across 3.10, 3.12, 3.13 plus Node installer CI
 
 ## Development discipline
 
@@ -280,14 +318,14 @@ Primary quality metric:
 
 ## Next work
 
-The highest-value next slices are:
+The highest-value next slices are now driven by practical usage rather than feature parity:
 
-1. end-to-end cross-agent handoff fixtures using persisted scoped memories;
-2. measured npx install + recall latency/token regression tests;
-3. automatic meaningful-event capture (`memory.propose`) with governance;
-4. cold-source lazy extraction and cache;
-5. MCP gateway and thin per-agent projections;
-6. publish `@al-hub/agent-memory-hub` to npm once package ownership/credentials are ready.
+1. run the same benchmark on the normal WSL development environment and add cold/warm breakdowns;
+2. break the ~72 ms hook path into Python startup, Git inspection, state lookup, retrieval, and projection costs;
+3. add 50k/100k archive and multi-worktree tiers before changing indexes;
+4. add end-to-end Agent A → Agent B handoff fixtures using persisted scoped memories;
+5. automatic meaningful-event capture (`memory.propose`) with governance;
+6. cold-source lazy extraction/cache and MCP only where real workflows justify them.
 
 `worktree-context` remains a compatibility/reference benchmark until automatic onboarding, worktree resume, cross-agent handoff, session reset, and HEAD-aware stale handling are all proven in real workflows.
 
