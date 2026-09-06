@@ -22,6 +22,7 @@ class ContinuityGate:
         r"(?:전에|예전에|지난번|아까|기존에|결정했던|정했던|왜\s*.*했지|remember|previous|earlier)",
         re.IGNORECASE,
     )
+    _SESSION_RESUME_SOURCES = {"resume", "clear", "compact", "fork"}
 
     def _is_handoff(self, message: str) -> bool:
         lowered = message.lower()
@@ -36,6 +37,12 @@ class ContinuityGate:
 
         if self._is_handoff(message):
             return ContinuityDecision(ContinuityMode.HANDOFF, "cross-agent continuity wording")
+
+        if request.repository_known and request.session_source in self._SESSION_RESUME_SOURCES:
+            return ContinuityDecision(
+                ContinuityMode.RESUME,
+                f"SessionStart source={request.session_source}",
+            )
 
         if request.session_reset and request.repository_known:
             return ContinuityDecision(ContinuityMode.RESUME, "known repository after session reset")
