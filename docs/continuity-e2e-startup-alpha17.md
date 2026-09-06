@@ -90,6 +90,24 @@ unproven extra fast-path duplication = do not add
 
 Further startup optimization should require a repeatable improvement on both CI diagnostics and real WSL measurements. Long-lived daemon/server architecture is not introduced merely to save tens of milliseconds at SessionStart.
 
+## Alpha.17 final continuity baseline
+
+Final validation run `34031564291` completed successfully on GitHub Actions / Python 3.12.14.
+
+At 100k memories:
+
+| Scenario | p50 | p95 |
+| --- | ---: | ---: |
+| NO_RECALL | 7.31 ms | 8.04 ms |
+| Resume prompt | 13.87 ms | 14.22 ms |
+| Handoff prompt | 13.96 ms | 14.84 ms |
+| SessionStart resume core | 28.04 ms | 28.75 ms |
+| Codex hook | 95.48 ms | 97.25 ms |
+| Claude clear hook | 95.57 ms | 97.04 ms |
+| Gemini startup hook | 95.15 ms | 96.15 ms |
+
+The hook values are directionally lower than the earlier alpha.15 ~116 ms reference, but hosted-runner differences prevent treating that cross-run delta as a guaranteed percentage improvement. The important release conclusion is no correctness or scale regression after the persisted-handoff and SessionStart refactors.
+
 ## Benchmark command
 
 The practical machine benchmark now includes the startup breakdown in the same JSON report:
