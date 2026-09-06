@@ -2,7 +2,7 @@
 
 **One trusted memory for every AI agent.**
 
-Current development baseline: **v0.2.0-alpha.13**
+Current development baseline: **v0.2.0-alpha.14**
 
 `agent-memory-hub` is a local-first shared L2 memory and continuity layer for AI coding agents. It is specialized for practical coding workflows: fast startup/resume, repository/worktree/HEAD correctness, bounded context, cross-agent handoff, and minimal manual memory commands.
 
@@ -161,17 +161,31 @@ scope browse            grows with archive size
 prompt FTS recall       is the primary scale-sensitive path
 ```
 
-In the synthetic scale corpus, many foreign-repository memories intentionally share lexical terms. That exposes the current cost of broad FTS matching before scope constraints narrow the usable candidates.
+### Scope-first FTS A/B experiment
 
-Therefore the next performance experiment is **scope-first candidate narrowing/indexing before FTS**, not embeddings, LLM reranking, or a larger runtime.
+The first scope-first experiment keeps the existing broad FTS reader as the control and adds a separate experimental FTS index containing a deterministic `(scope, scope_ref)` token. FTS5 can therefore intersect visible scope postings with lexical postings before joining governed memories.
+
+Ordered top-8 result IDs were identical at every measured tier.
+
+| Memories | Broad FTS p50 | Scope-first p50 | p50 speedup | Scope-first extra storage |
+| ---: | ---: | ---: | ---: | ---: |
+| 1k | 1.781 ms | 0.637 ms | 2.80x | 0.23 MiB |
+| 10k | 13.247 ms | 1.382 ms | 9.59x | 2.11 MiB |
+| 50k | 68.842 ms | 4.044 ms | 17.02x | 9.86 MiB |
+| 100k | 138.777 ms | 7.362 ms | 18.85x | 21.10 MiB |
+
+At 100k memories the experiment reduces lexical retrieval from roughly 139 ms to roughly 7 ms p50 while preserving ordered top-k parity. This validates scope-first retrieval as a strong optimization candidate.
+
+It is **not the production default yet**. The first A/B implementation deliberately maintains a second full FTS index so control and experiment can coexist cleanly. Before adoption, the same scope-token idea should be integrated into a storage-efficient single-index layout with safe migration/backfill.
 
 Detailed records:
 
 - [First 1k/10k baseline](docs/baseline-alpha11.md)
 - [1k–100k scale + phase breakdown](docs/baseline-alpha12-scale.md)
+- [Scope-first FTS A/B](docs/scope-first-fts-ab-alpha13.md)
 - [Benchmark plan](docs/benchmark-plan.md)
 
-Reproduce locally:
+Reproduce the control baseline:
 
 ```bash
 python3 benchmarks/continuity_baseline.py \
@@ -182,7 +196,17 @@ python3 benchmarks/continuity_baseline.py \
   --output benchmark-results.json
 ```
 
-CI uploads the JSON as `continuity-benchmark-baseline` without failing builds on latency values.
+Reproduce the A/B experiment:
+
+```bash
+python3 benchmarks/scope_first_ab.py \
+  --sizes 1000,10000,50000,100000 \
+  --warmup 5 \
+  --iterations 30 \
+  --output scope-first-ab-results.json
+```
+
+CI uploads `continuity-benchmark-baseline` and `scope-first-fts-ab`. The A/B job fails if ordered result IDs diverge.
 
 ## Memory governance
 
@@ -225,7 +249,7 @@ Default local data directory:
 
 Compatibility storage/governance commands remain available in `scripts/memory_hub.py`.
 
-## v0.2.0-alpha.13 status
+## v0.2.0-alpha.14 status
 
 Implemented and tested:
 
@@ -241,19 +265,23 @@ Implemented and tested:
 - reproducible p50/p95 practical benchmark harness
 - isolated phase timing breakdown
 - 1k / 10k / 50k / 100k archive tiers
-- machine-readable benchmark artifacts
+- experimental `ScopeFirstSQLiteMemoryReader` with safe broad-reader fallback
+- scope-token FTS A/B harness with ordered-result parity gate
+- measured 2.80x → 18.85x p50 scope-first speedup from 1k → 100k
+- machine-readable baseline and A/B benchmark artifacts
 - Python 3.10/3.12/3.13 and Node installer CI
 
 ## Next work
 
 Development is driven by practical usage rather than feature parity:
 
-1. reproduce the 1k–100k baseline on the normal WSL development machine;
-2. test scope-first SQLite/FTS candidate narrowing against the current baseline;
-3. keep 1k/10k latency, scope correctness, and token budget from regressing while improving 50k/100k;
-4. add persisted Agent A → Agent B handoff and multi-worktree end-to-end fixtures;
-5. add meaningful-event capture only after continuity read-path behavior is stable;
-6. add semantic fallback/MCP only where measured workflows justify them.
+1. test a storage-efficient **single-index scope-token FTS layout** against both broad FTS and the validated two-index experiment;
+2. require ordered-result parity, worktree/repository isolation, and governance-filter parity before default adoption;
+3. add non-destructive scoped-index migration/backfill and write/update synchronization;
+4. reproduce 1k–100k results on the normal WSL development machine;
+5. add persisted Agent A → Agent B handoff and multi-worktree end-to-end fixtures;
+6. add meaningful-event capture only after continuity read-path behavior is stable;
+7. add semantic fallback/MCP only where measured workflows justify them.
 
 ## Safety / privacy
 
