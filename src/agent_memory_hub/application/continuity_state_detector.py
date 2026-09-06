@@ -23,6 +23,7 @@ class ContinuityStateDetector:
                 session_reset=False,
                 session_has_context=observation.session_has_context,
                 stale_head=False,
+                current_agent=observation.agent,
             )
 
         repository_id = repository.canonical_id
@@ -42,6 +43,12 @@ class ContinuityStateDetector:
             and observation.context.head_sha
             and previous.head_sha != observation.context.head_sha
         )
+        previous_agent = previous.agent if previous else None
+        agent_changed = bool(
+            previous_agent
+            and observation.agent
+            and previous_agent != observation.agent
+        )
 
         self._state_store.save(
             repository_id,
@@ -49,6 +56,7 @@ class ContinuityStateDetector:
             StoredContinuityState(
                 session_id=observation.session_id,
                 head_sha=observation.context.head_sha,
+                agent=observation.agent or previous_agent,
             ),
         )
 
@@ -57,4 +65,7 @@ class ContinuityStateDetector:
             session_reset=session_reset,
             session_has_context=observation.session_has_context,
             stale_head=stale_head,
+            agent_changed=agent_changed,
+            previous_agent=previous_agent,
+            current_agent=observation.agent,
         )
