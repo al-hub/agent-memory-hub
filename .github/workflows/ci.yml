@@ -21,6 +21,7 @@ jobs:
         run: |
           python -m py_compile scripts/memory_hub.py
           python -m py_compile benchmarks/continuity_baseline.py
+          python -m py_compile benchmarks/scope_first_ab.py
           python -m compileall -q src
       - name: Tests
         run: python -m unittest discover -s tests -v
@@ -62,3 +63,24 @@ jobs:
         with:
           name: continuity-benchmark-baseline
           path: benchmark-results.json
+
+  benchmark-scope-first-ab:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Broad vs scope-first FTS
+        run: |
+          python benchmarks/scope_first_ab.py \
+            --sizes 1000,10000,50000,100000 \
+            --warmup 5 \
+            --iterations 30 \
+            --output scope-first-ab-results.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scope-first-fts-ab
+          path: scope-first-ab-results.json
