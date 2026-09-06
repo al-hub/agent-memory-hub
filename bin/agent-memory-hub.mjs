@@ -90,8 +90,8 @@ Benchmark defaults:
 Quick benchmark:
   agent-memory-hub benchmark --quick
 
-Current GitHub-backed npx form:
-  npx -y github:al-hub/agent-memory-hub benchmark
+Current GitHub-backed npx form (npm 12+ requires explicit git opt-in):
+  npx --allow-git=all -y github:al-hub/agent-memory-hub benchmark
 
 After npm publication:
   npx -y @al-hub/agent-memory-hub@latest benchmark
