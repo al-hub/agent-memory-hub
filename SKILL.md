@@ -161,7 +161,7 @@ If a source pointer matters, inspect the memory/evidence instead of trusting a s
 
 When conflicts are unresolved, surface them to the user/agent rather than inventing a resolution.
 
-## Health and bootstrap
+## Health, benchmark, and bootstrap
 
 The npx installer initializes the store. Existing accessible L1 sources can be bootstrapped explicitly:
 
@@ -170,11 +170,19 @@ python3 ~/.agent-memory-hub/runtime/scripts/memory_hub.py import-l1 --dry-run
 python3 ~/.agent-memory-hub/runtime/scripts/memory_hub.py import-l1
 ```
 
-For diagnostics:
+For store diagnostics:
 
 ```bash
 python3 ~/.agent-memory-hub/runtime/scripts/memory_hub.py doctor
 python3 ~/.agent-memory-hub/runtime/scripts/memory_hub.py status
 ```
+
+For practical local/WSL latency diagnostics use the packaged npx command rather than inventing a separate benchmark:
+
+```bash
+npx -y github:al-hub/agent-memory-hub benchmark
+```
+
+Use `--quick` for a smoke measurement. The full benchmark records WSL/toolchain/filesystem metadata, warm in-process continuity, fresh-process NO_RECALL/Resume/Handoff, real SessionStart hook p50/p95, and writes `agent-memory-hub-benchmark.json` by default. Fresh-process measurements do not claim to flush the OS page cache.
 
 Only import sources actually accessible/configured on disk. Never claim access to private product memory that is not available.
