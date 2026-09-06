@@ -8,6 +8,7 @@ from typing import Protocol
 class StoredContinuityState:
     session_id: str | None = None
     head_sha: str | None = None
+    agent: str | None = None
 
 
 class RepositoryKnowledgeReader(Protocol):
