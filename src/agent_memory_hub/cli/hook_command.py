@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from agent_memory_hub.cli.continuity import build_continuity_command
+from agent_memory_hub.cli.session_continuity import build_session_start_command
 from agent_memory_hub.cli.session_hook import AgentKind, SessionHookAdapter
 
 
 class SessionStartHookCommand:
-    """Bridge supported agent SessionStart hooks to the seamless continuity pipeline."""
+    """Bridge supported agent SessionStart hooks to the lightweight continuity path."""
 
     def __init__(self, home: str | Path, agent: AgentKind | str, *, token_budget: int = 1000):
         self._home = Path(home).expanduser()
@@ -34,7 +34,7 @@ class SessionStartHookCommand:
 
     def handle(self, hook_payload: dict) -> str:
         invocation = self._adapter.parse(hook_payload)
-        command = build_continuity_command(self._home, token_budget=self._token_budget)
+        command = build_session_start_command(self._home, token_budget=self._token_budget)
         raw = command.run(
             message="",
             cwd=invocation.cwd,
