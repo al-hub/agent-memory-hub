@@ -32,3 +32,12 @@ class ExecutionContext:
     branch: Optional[str] = None
     head_sha: Optional[str] = None
     task: Optional[str] = None
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedScope:
+    """A scope key that is safe to compare across repositories and worktrees."""
+
+    level: ScopeLevel
+    ref: Optional[str] = None
+    repository_id: Optional[str] = None
