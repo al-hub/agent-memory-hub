@@ -86,6 +86,7 @@ class ContinuityCommand:
         session_has_context: bool,
         token_budget: int,
         json_output: bool,
+        session_source: str | None = None,
     ) -> str:
         # token_budget is accepted here so all entry points share one stable CLI
         # contract. The real composition root configures the service with it.
@@ -96,6 +97,7 @@ class ContinuityCommand:
             context=context,
             session_id=session_id,
             session_has_context=session_has_context,
+            session_source=session_source,
         )
         result = self._seamless_service.handle(observation)
         payload = self._payload(result)
