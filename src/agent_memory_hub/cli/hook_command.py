@@ -41,6 +41,7 @@ class SessionStartHookCommand:
             session_id=invocation.session_id,
             session_has_context=invocation.session_has_context,
             session_source=invocation.session_source,
+            agent=invocation.agent.value,
             token_budget=self._token_budget,
             json_output=True,
         )
