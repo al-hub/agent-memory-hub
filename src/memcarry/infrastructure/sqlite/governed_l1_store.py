@@ -43,6 +43,14 @@ def _confidence(strength: EvidenceStrength) -> float:
     }[strength]
 
 
+def _strength_from_confidence(confidence: float) -> EvidenceStrength:
+    if confidence >= 0.90:
+        return EvidenceStrength.STRONG
+    if confidence >= 0.70:
+        return EvidenceStrength.MEDIUM
+    return EvidenceStrength.WEAK
+
+
 class SQLiteGovernedL1Store:
     """Persist candidate L1 claims into the existing governed L2 schema.
 
@@ -93,6 +101,21 @@ class SQLiteGovernedL1Store:
                 );
                 CREATE INDEX IF NOT EXISTS idx_hash ON memories(normalized_hash);
 
+                CREATE TABLE IF NOT EXISTS raw_sources(
+                    id TEXT PRIMARY KEY,
+                    source_agent TEXT,
+                    source_type TEXT NOT NULL,
+                    source_pointer TEXT,
+                    content_hash TEXT NOT NULL,
+                    evidence_group TEXT,
+                    local_snapshot TEXT,
+                    extraction_state TEXT NOT NULL DEFAULT 'cold',
+                    captured_at INTEGER NOT NULL,
+                    UNIQUE(content_hash, source_pointer)
+                );
+                CREATE INDEX IF NOT EXISTS idx_raw_hash ON raw_sources(content_hash);
+                CREATE INDEX IF NOT EXISTS idx_raw_state ON raw_sources(extraction_state);
+
                 CREATE TABLE IF NOT EXISTS evidence(
                     id TEXT PRIMARY KEY,
                     memory_id TEXT NOT NULL,
@@ -106,9 +129,12 @@ class SQLiteGovernedL1Store:
                     confidence REAL,
                     created_at INTEGER NOT NULL,
                     UNIQUE(memory_id, source_hash, source_pointer),
-                    FOREIGN KEY(memory_id) REFERENCES memories(id) ON DELETE CASCADE
+                    FOREIGN KEY(memory_id) REFERENCES memories(id) ON DELETE CASCADE,
+                    FOREIGN KEY(raw_source_id) REFERENCES raw_sources(id) ON DELETE SET NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_evidence_memory ON evidence(memory_id);
+                CREATE INDEX IF NOT EXISTS idx_evidence_raw ON evidence(raw_source_id);
+                CREATE INDEX IF NOT EXISTS idx_evidence_group ON evidence(evidence_group);
 
                 CREATE TABLE IF NOT EXISTS l1_claim_index(
                     memory_id TEXT PRIMARY KEY,
@@ -171,6 +197,43 @@ class SQLiteGovernedL1Store:
 
         con = self._connect()
         try:
+            raw_source_id = self._register_raw_source(con, record, evidence)
+
+            exact = con.execute(
+                """
+                SELECT id,type,confidence,review_state,valid_from
+                FROM memories
+                WHERE normalized_hash=?
+                  AND scope='repository' AND scope_ref=?
+                  AND COALESCE(lifecycle, 'candidate') != 'quarantined'
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (incoming.value_hash, record.repository_id),
+            ).fetchone()
+            if exact is not None:
+                self._attach_evidence(con, exact["id"], raw_source_id, record, evidence)
+                con.execute(
+                    """
+                    INSERT OR IGNORE INTO l1_claim_index(
+                        memory_id, repository_id, semantic_key, value_hash, memory_type,
+                        observed_at, head_sha, evidence_strength
+                    ) VALUES(?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        exact["id"],
+                        record.repository_id,
+                        incoming.semantic_key,
+                        incoming.value_hash,
+                        exact["type"],
+                        exact["valid_from"] or record.observed_at,
+                        None,
+                        _strength_from_confidence(float(exact["confidence"])).value,
+                    ),
+                )
+                con.commit()
+                return ReconciliationAction.ATTACH_EVIDENCE
+
             existing_row = con.execute(
                 """
                 SELECT i.*, m.review_state
@@ -189,7 +252,7 @@ class SQLiteGovernedL1Store:
                     current_head and record.head_sha and record.head_sha != current_head
                 ) else "unverified"
                 memory_id = self._insert_candidate(con, record, evidence, incoming, review_state=review_state)
-                self._attach_evidence(con, memory_id, record, evidence)
+                self._attach_evidence(con, memory_id, raw_source_id, record, evidence)
                 con.commit()
                 return ReconciliationAction.MARK_STALE if review_state == "needs_review" else None
 
@@ -207,10 +270,10 @@ class SQLiteGovernedL1Store:
             existing_id = existing_row["memory_id"]
 
             if outcome.action == ReconciliationAction.ATTACH_EVIDENCE:
-                self._attach_evidence(con, existing_id, record, evidence)
+                self._attach_evidence(con, existing_id, raw_source_id, record, evidence)
             elif outcome.action == ReconciliationAction.SUPERSEDE:
                 new_id = self._insert_candidate(con, record, evidence, incoming, review_state=outcome.incoming_review_state)
-                self._attach_evidence(con, new_id, record, evidence)
+                self._attach_evidence(con, new_id, raw_source_id, record, evidence)
                 con.execute(
                     "UPDATE memories SET lifecycle='superseded', status='superseded', superseded_by=?, updated_at=? WHERE id=?",
                     (new_id, _now(), existing_id),
@@ -221,17 +284,47 @@ class SQLiteGovernedL1Store:
                     (_now(), existing_id),
                 )
                 new_id = self._insert_candidate(con, record, evidence, incoming, review_state="conflict")
-                self._attach_evidence(con, new_id, record, evidence)
+                self._attach_evidence(con, new_id, raw_source_id, record, evidence)
             elif outcome.action in {ReconciliationAction.RECORD_CONTRADICTION, ReconciliationAction.MARK_STALE}:
-                self._attach_evidence(con, existing_id, record, evidence)
+                self._attach_evidence(con, existing_id, raw_source_id, record, evidence)
             elif outcome.action == ReconciliationAction.KEEP_SEPARATE:
                 new_id = self._insert_candidate(con, record, evidence, incoming, review_state=outcome.incoming_review_state)
-                self._attach_evidence(con, new_id, record, evidence)
+                self._attach_evidence(con, new_id, raw_source_id, record, evidence)
 
             con.commit()
             return outcome.action
         finally:
             con.close()
+
+    def _register_raw_source(self, con: sqlite3.Connection, record: L1Record, evidence: L1Evidence) -> str:
+        content_hash = _hash(record.content)
+        existing = con.execute(
+            "SELECT id FROM raw_sources WHERE content_hash=? AND source_pointer IS ?",
+            (content_hash, record.source_path),
+        ).fetchone()
+        if existing is not None:
+            return existing["id"]
+        raw_id = _id("raw_")
+        con.execute(
+            """
+            INSERT INTO raw_sources(
+                id,source_agent,source_type,source_pointer,content_hash,
+                evidence_group,local_snapshot,extraction_state,captured_at
+            ) VALUES(?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                raw_id,
+                record.source_agent,
+                record.kind,
+                record.source_path,
+                content_hash,
+                evidence.evidence_group,
+                None,
+                "extracted",
+                _now(),
+            ),
+        )
+        return raw_id
 
     def _insert_candidate(
         self,
@@ -245,6 +338,7 @@ class SQLiteGovernedL1Store:
         memory_id = _id("mem_")
         ts = _now()
         status = "needs_review" if review_state == "needs_review" else ("conflict" if review_state == "conflict" else "candidate")
+        source_hash = _hash(record.provenance_key + "\0" + record.content)
         con.execute(
             """
             INSERT INTO memories(
@@ -266,7 +360,7 @@ class SQLiteGovernedL1Store:
                 record.source_agent,
                 record.kind,
                 record.source_path,
-                _hash(record.provenance_key),
+                source_hash,
                 evidence.evidence_group,
                 record.observed_at,
                 None,
@@ -299,8 +393,15 @@ class SQLiteGovernedL1Store:
         )
         return memory_id
 
-    def _attach_evidence(self, con: sqlite3.Connection, memory_id: str, record: L1Record, evidence: L1Evidence) -> None:
-        source_hash = _hash(record.provenance_key)
+    def _attach_evidence(
+        self,
+        con: sqlite3.Connection,
+        memory_id: str,
+        raw_source_id: str,
+        record: L1Record,
+        evidence: L1Evidence,
+    ) -> None:
+        source_hash = _hash(record.provenance_key + "\0" + record.content)
         con.execute(
             """
             INSERT OR IGNORE INTO evidence(
@@ -312,7 +413,7 @@ class SQLiteGovernedL1Store:
             (
                 _id("ev_"),
                 memory_id,
-                None,
+                raw_source_id,
                 evidence.source_agent,
                 evidence.source_type,
                 evidence.source_pointer,
@@ -370,6 +471,14 @@ class SQLiteGovernedL1Store:
         con = self._connect()
         try:
             row = con.execute("SELECT COUNT(*) FROM evidence").fetchone()
+            return int(row[0])
+        finally:
+            con.close()
+
+    def count_raw_sources(self) -> int:
+        con = self._connect()
+        try:
+            row = con.execute("SELECT COUNT(*) FROM raw_sources").fetchone()
             return int(row[0])
         finally:
             con.close()
