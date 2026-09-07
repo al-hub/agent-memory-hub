@@ -52,6 +52,7 @@ class L1IngestionPipeline:
         processed = 0
         actions: list[ReconciliationAction] = []
         complete = True
+        last_cursor = plan.after_cursor
 
         while True:
             if max_records is not None and processed >= max_records:
@@ -71,15 +72,19 @@ class L1IngestionPipeline:
             if action is not None:
                 actions.append(action)
             processed += 1
+            if record.cursor is not None:
+                last_cursor = record.cursor
+            elif (last_cursor or "").isdigit():
+                last_cursor = str(int(last_cursor or 0) + 1)
+            elif last_cursor is None:
+                last_cursor = str(processed)
 
-        previous_count = int(plan.after_cursor or 0) if (plan.after_cursor or "").isdigit() else 0
-        cursor = str(previous_count + processed)
         saved_fingerprint = L1SourceFingerprint(
             source_id=fingerprint.source_id,
             size=fingerprint.size,
             mtime_ns=fingerprint.mtime_ns,
             digest=fingerprint.digest,
-            cursor=cursor,
+            cursor=last_cursor,
         )
         self._state_store.save(
             ProcessedL1SourceState(
