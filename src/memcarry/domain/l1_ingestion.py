@@ -32,7 +32,13 @@ class L1Record:
     branch: str | None = None
     head_sha: str | None = None
     source_path: str | None = None
+    memory_type: str = "fact"
+    semantic_key: str | None = None
 
     @property
     def provenance_key(self) -> str:
         return f"{self.source_agent}:{self.source_id}"
+
+    @property
+    def effective_semantic_key(self) -> str:
+        return self.semantic_key or self.content.strip().lower()
