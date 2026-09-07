@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
 
 from memcarry.application.l1_ingestion_pipeline import DEFAULT_MAX_RECORDS, L1IngestionPipeline
+from memcarry.domain.l1_governance import ReconciliationAction
 from memcarry.domain.l1_ingestion import IngestionMode, L1Record
 from memcarry.domain.l1_source import L1SourceFingerprint
 from memcarry.infrastructure.sqlite.governed_l1_store import SQLiteGovernedL1Store
@@ -80,6 +82,7 @@ class L1IngestionPipelineIntegrationTest(unittest.TestCase):
         semantic_key: str = "runtime",
         observed_at: str = "2026-09-08T00:00:00Z",
         cursor: str | None = None,
+        head_sha: str = "head-1",
     ) -> L1Record:
         return L1Record(
             source_agent="fake",
@@ -89,14 +92,14 @@ class L1IngestionPipelineIntegrationTest(unittest.TestCase):
             kind=kind,
             repository_id=repo,
             branch="main",
-            head_sha="head-1",
+            head_sha=head_sha,
             source_path=f"/fake/{source_id}",
             memory_type=memory_type,
             semantic_key=semantic_key,
             cursor=cursor,
         )
 
-    def test_empty_bootstrap_persists_candidates_and_evidence(self):
+    def test_empty_bootstrap_persists_candidates_evidence_and_raw_provenance(self):
         source = FakeL1Source("s1", [self.record("r1", "Use SQLite for governed L2")])
 
         result = self.pipeline.ingest(source, repository_id="al-hub/memcarry", current_head="head-1")
@@ -105,6 +108,7 @@ class L1IngestionPipelineIntegrationTest(unittest.TestCase):
         self.assertEqual(result.processed, 1)
         self.assertEqual(self.memory_store.count_memories(), 1)
         self.assertEqual(self.memory_store.count_evidence(), 1)
+        self.assertEqual(self.memory_store.count_raw_sources(), 1)
         memory = self.memory_store.list_memories()[0]
         self.assertEqual(memory["lifecycle"], "candidate")
         self.assertEqual(memory["review_state"], "unverified")
@@ -192,6 +196,19 @@ class L1IngestionPipelineIntegrationTest(unittest.TestCase):
         self.assertEqual(self.memory_store.count_memories(), 2)
         self.assertEqual(self.memory_store.count_evidence(), 2)
 
+    def test_replay_after_cursor_state_loss_is_idempotent(self):
+        source = FakeL1Source("crash", [self.record("c1", "Crash-safe decision")])
+        self.pipeline.ingest(source, repository_id="al-hub/memcarry", current_head="head-1")
+        with sqlite3.connect(self.db_path) as con:
+            con.execute("DELETE FROM l1_source_state WHERE source_id='crash'")
+
+        replay = self.pipeline.ingest(source, repository_id="al-hub/memcarry", current_head="head-1")
+
+        self.assertEqual(replay.mode, IngestionMode.RECONCILE)
+        self.assertEqual(self.memory_store.count_memories(), 1)
+        self.assertEqual(self.memory_store.count_evidence(), 1)
+        self.assertEqual(self.memory_store.count_raw_sources(), 1)
+
     def test_opaque_record_cursor_is_preserved_for_incremental_resume(self):
         first_record = self.record("o1", "Opaque one", semantic_key="o1", cursor="session:42")
         second_record = self.record("o2", "Opaque two", semantic_key="o2", cursor="session:99")
@@ -215,6 +232,28 @@ class L1IngestionPipelineIntegrationTest(unittest.TestCase):
 
         self.assertEqual(self.memory_store.count_memories(), 1)
         self.assertEqual(self.memory_store.count_evidence(), 2)
+        self.assertEqual(self.memory_store.count_raw_sources(), 2)
+
+    def test_conflicting_decisions_preserve_both_and_mark_conflict(self):
+        first = FakeL1Source("conflict-a", [self.record("ca", "Use SQLite", semantic_key="storage")])
+        second = FakeL1Source("conflict-b", [self.record("cb", "Use Postgres", semantic_key="storage")], digest="other")
+        self.pipeline.ingest(first, repository_id="al-hub/memcarry", current_head="head-1")
+        result = self.pipeline.ingest(second, repository_id="al-hub/memcarry", current_head="head-1")
+
+        self.assertIn(ReconciliationAction.RECORD_CONFLICT, result.actions)
+        rows = self.memory_store.list_memories(repository_id="al-hub/memcarry")
+        self.assertEqual(len(rows), 2)
+        self.assertEqual({row["review_state"] for row in rows}, {"conflict"})
+
+    def test_historical_head_is_marked_needs_review(self):
+        source = FakeL1Source("stale", [self.record("stale-1", "Historical state", memory_type="project_state", semantic_key="state", head_sha="old-head")])
+
+        result = self.pipeline.ingest(source, repository_id="al-hub/memcarry", current_head="head-1")
+
+        self.assertIn(ReconciliationAction.MARK_STALE, result.actions)
+        memory = self.memory_store.list_memories(repository_id="al-hub/memcarry")[0]
+        self.assertEqual(memory["review_state"], "needs_review")
+        self.assertEqual(memory["status"], "needs_review")
 
     def test_newer_project_state_supersedes_old_value(self):
         first = FakeL1Source(
