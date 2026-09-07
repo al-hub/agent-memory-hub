@@ -168,47 +168,53 @@ A feature is complete only when applicable items are satisfied:
 
 ## Implementation sequence
 
+The current priority plan for historical L1 bootstrap, first-seen repository onboarding, and incremental reconciliation is defined in `bootstrap-reconciliation-development-plan.md`. That plan supersedes the older ordering that placed automatic learning before historical bootstrap: the governed ingestion core is now built first so both historical import and future meaningful-event capture use one write path.
+
 ### Phase A — Seamless Core
 
 1. canonical repository identity — implemented
 2. worktree/branch/HEAD detection — implemented
 3. scope hierarchy — implemented at domain/application level
-4. typed + scope-aware FTS retrieval — next
-5. Continuity Gate
-6. token-budget Context Projector
+4. typed + scope-aware FTS retrieval — implemented
+5. Continuity Gate — implemented
+6. token-budget Context Projector — implemented
 
 ### Phase B — Continuity presets
 
-1. onboarding
-2. resume
-3. handoff
-4. worktree checkpoint/resume
-5. HEAD-aware stale handling
+1. onboarding — implemented
+2. resume — implemented
+3. handoff — implemented
+4. worktree checkpoint/resume — implemented
+5. HEAD-aware stale handling — implemented
 
-### Phase C — Automatic learning
+### Phase C — Governed L1 ingestion
+
+1. freeze `EMPTY`, `FIRST`, `EXISTING`, and interrupted/replay scenarios
+2. normalized L1 record/source-adapter contract
+3. evidence provenance and source-strength metadata
+4. deterministic dedupe/update/conflict/temporal policy
+5. idempotent persistence and source fingerprint/cursor state
+6. bounded EMPTY bootstrap
+7. repository-targeted FIRST onboarding import
+8. incremental EXISTING reconciliation
+9. contract/integration/performance regression coverage
+10. real Codex/Claude/Gemini/AGY adapters, one at a time
+
+### Phase D — Automatic learning over the same ingestion path
 
 1. meaningful-event detection
 2. `memory.propose`
-3. deterministic dedupe
-4. update vs conflict vs different-context
+3. decision/constraint/verified-result/failed-attempt capture
+4. current-goal/next-action/unresolved-issue capture
 5. promotion/review/quarantine policy
-
-### Phase D — Historical bootstrap
-
-1. adapter discovery
-2. raw-source registration
-3. cold FTS indexing
-4. lazy extraction
-5. extracted-memory cache
+6. replay real dogfooding failures as deterministic regression fixtures
 
 ### Phase E — Universal integration
 
-1. Codex adapter
-2. Claude adapter
-3. Gemini/Antigravity adapter
-4. MCP gateway
-5. optional hot cache
-6. benchmark/regression hardening
+1. MCP gateway where measured workflows justify it
+2. optional hot cache
+3. semantic fallback only for demonstrated fast-path misses
+4. benchmark/regression hardening
 
 ## Worktree-context retirement gate
 
