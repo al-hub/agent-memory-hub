@@ -34,6 +34,7 @@ class L1Record:
     source_path: str | None = None
     memory_type: str = "fact"
     semantic_key: str | None = None
+    cursor: str | None = None
 
     @property
     def provenance_key(self) -> str:
