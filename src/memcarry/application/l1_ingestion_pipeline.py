@@ -11,6 +11,9 @@ from memcarry.ports.l1_source import L1SourceAdapter
 from memcarry.ports.l1_source_state import L1SourceStateStore
 
 
+DEFAULT_MAX_RECORDS = 50
+
+
 @dataclass(frozen=True, slots=True)
 class L1IngestionResult:
     mode: IngestionMode
@@ -33,7 +36,7 @@ class L1IngestionPipeline:
         *,
         repository_id: str,
         current_head: str | None,
-        max_records: int | None = None,
+        max_records: int | None = DEFAULT_MAX_RECORDS,
     ) -> L1IngestionResult:
         if max_records is not None and max_records <= 0:
             raise ValueError("max_records must be positive when provided")
