@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from memcarry.application.l1_ingestion_pipeline import L1IngestionPipeline
+from memcarry.application.l1_ingestion_pipeline import DEFAULT_MAX_RECORDS, L1IngestionPipeline
 from memcarry.domain.l1_ingestion import IngestionMode, L1Record
 from memcarry.domain.l1_source import L1SourceFingerprint
 from memcarry.infrastructure.sqlite.governed_l1_store import SQLiteGovernedL1Store
@@ -33,6 +33,31 @@ class FakeL1Source:
                 yield record
 
 
+class OpaqueCursorSource:
+    def __init__(self, records: list[L1Record], *, digest: str):
+        self._records = records
+        self._digest = digest
+        self.calls: list[str | None] = []
+
+    @property
+    def source_id(self) -> str:
+        return "opaque"
+
+    def fingerprint(self) -> L1SourceFingerprint:
+        return L1SourceFingerprint(source_id="opaque", size=len(self._records), mtime_ns=len(self._records), digest=self._digest)
+
+    def iter_records(self, *, repository_id: str | None = None, after_cursor: str | None = None):
+        self.calls.append(after_cursor)
+        passed = after_cursor is None
+        for record in self._records:
+            if not passed:
+                if record.cursor == after_cursor:
+                    passed = True
+                continue
+            if repository_id is None or record.repository_id == repository_id:
+                yield record
+
+
 class L1IngestionPipelineIntegrationTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -54,6 +79,7 @@ class L1IngestionPipelineIntegrationTest(unittest.TestCase):
         memory_type: str = "decision",
         semantic_key: str = "runtime",
         observed_at: str = "2026-09-08T00:00:00Z",
+        cursor: str | None = None,
     ) -> L1Record:
         return L1Record(
             source_agent="fake",
@@ -67,6 +93,7 @@ class L1IngestionPipelineIntegrationTest(unittest.TestCase):
             source_path=f"/fake/{source_id}",
             memory_type=memory_type,
             semantic_key=semantic_key,
+            cursor=cursor,
         )
 
     def test_empty_bootstrap_persists_candidates_and_evidence(self):
@@ -83,6 +110,16 @@ class L1IngestionPipelineIntegrationTest(unittest.TestCase):
         self.assertEqual(memory["review_state"], "unverified")
         self.assertEqual(memory["scope"], "repository")
         self.assertEqual(memory["scope_ref"], "al-hub/memcarry")
+
+    def test_empty_bootstrap_is_bounded_by_default(self):
+        records = [self.record(f"r{i}", f"Decision {i}", semantic_key=f"k{i}") for i in range(DEFAULT_MAX_RECORDS + 1)]
+        source = FakeL1Source("bounded", records, size=len(records), mtime_ns=1)
+
+        result = self.pipeline.ingest(source, repository_id="al-hub/memcarry", current_head="head-1")
+
+        self.assertEqual(result.processed, DEFAULT_MAX_RECORDS)
+        self.assertFalse(result.complete)
+        self.assertEqual(self.memory_store.count_memories(), DEFAULT_MAX_RECORDS)
 
     def test_first_repository_onboard_filters_unrelated_records(self):
         self.memory_store.insert_seed_memory("other/repo", "existing")
@@ -154,6 +191,21 @@ class L1IngestionPipelineIntegrationTest(unittest.TestCase):
         self.assertEqual(source.calls[-1], ("al-hub/memcarry", "1"))
         self.assertEqual(self.memory_store.count_memories(), 2)
         self.assertEqual(self.memory_store.count_evidence(), 2)
+
+    def test_opaque_record_cursor_is_preserved_for_incremental_resume(self):
+        first_record = self.record("o1", "Opaque one", semantic_key="o1", cursor="session:42")
+        second_record = self.record("o2", "Opaque two", semantic_key="o2", cursor="session:99")
+        first = OpaqueCursorSource([first_record], digest="v1")
+        self.pipeline.ingest(first, repository_id="al-hub/memcarry", current_head="head-1")
+
+        second = OpaqueCursorSource([first_record, second_record], digest="v2")
+        result = self.pipeline.ingest(second, repository_id="al-hub/memcarry", current_head="head-1")
+
+        self.assertEqual(result.mode, IngestionMode.RECONCILE)
+        self.assertEqual(second.calls, ["session:42"])
+        state = self.state_store.load("opaque")
+        self.assertIsNotNone(state)
+        self.assertEqual(state.fingerprint.cursor, "session:99")
 
     def test_duplicate_claim_from_new_source_attaches_evidence_not_memory(self):
         first = FakeL1Source("s6a", [self.record("a1", "Same decision")])
