@@ -21,3 +21,10 @@ class L1SourceFingerprint:
         if self.digest is not None and previous.digest is not None:
             return self.digest != previous.digest
         return False
+
+
+@dataclass(frozen=True, slots=True)
+class ProcessedL1SourceState:
+    fingerprint: L1SourceFingerprint
+    repository_id: str | None
+    complete: bool
