@@ -51,6 +51,16 @@ def _strength_from_confidence(confidence: float) -> EvidenceStrength:
     return EvidenceStrength.WEAK
 
 
+def _columns(con: sqlite3.Connection, table: str) -> set[str]:
+    return {row[1] for row in con.execute(f"PRAGMA table_info({table})").fetchall()}
+
+
+def _add_column(con: sqlite3.Connection, table: str, definition: str) -> None:
+    name = definition.split()[0]
+    if name not in _columns(con, table):
+        con.execute(f"ALTER TABLE {table} ADD COLUMN {definition}")
+
+
 class SQLiteGovernedL1Store:
     """Persist candidate L1 claims into the existing governed L2 schema.
 
@@ -127,6 +137,10 @@ class SQLiteGovernedL1Store:
                     evidence_group TEXT,
                     excerpt TEXT,
                     confidence REAL,
+                    observed_at TEXT,
+                    branch TEXT,
+                    head_sha TEXT,
+                    repository_id TEXT,
                     created_at INTEGER NOT NULL,
                     UNIQUE(memory_id, source_hash, source_pointer),
                     FOREIGN KEY(memory_id) REFERENCES memories(id) ON DELETE CASCADE,
@@ -151,6 +165,18 @@ class SQLiteGovernedL1Store:
                     ON l1_claim_index(repository_id, semantic_key);
                 """
             )
+            # Non-destructive upgrade for stores created before per-evidence
+            # temporal/git provenance was introduced.
+            _add_column(con, "evidence", "observed_at TEXT")
+            _add_column(con, "evidence", "branch TEXT")
+            _add_column(con, "evidence", "head_sha TEXT")
+            _add_column(con, "evidence", "repository_id TEXT")
+            con.execute(
+                "CREATE INDEX IF NOT EXISTS idx_evidence_repository ON evidence(repository_id)"
+            )
+            con.execute(
+                "CREATE INDEX IF NOT EXISTS idx_evidence_head ON evidence(repository_id, head_sha)"
+            )
             con.commit()
         finally:
             con.close()
@@ -166,16 +192,29 @@ class SQLiteGovernedL1Store:
             con.close()
 
     def has_repository(self, repository_id: str) -> bool:
+        """Return true for any non-quarantined memory in the repository family.
+
+        Repository-local branch/worktree/task refs are encoded as
+        `<repository_id>::<scope>::<ref>`, so a repository already represented by
+        a narrower scope must not be misclassified as FIRST.
+        """
         con = self._connect()
         try:
+            prefix = repository_id + "::"
             row = con.execute(
                 """
                 SELECT 1 FROM memories
                 WHERE COALESCE(lifecycle, 'candidate') != 'quarantined'
-                  AND scope='repository' AND scope_ref=?
+                  AND (
+                    (scope='repository' AND scope_ref=?)
+                    OR (
+                      scope IN ('branch','worktree','task')
+                      AND substr(scope_ref, 1, ?) = ?
+                    )
+                  )
                 LIMIT 1
                 """,
-                (repository_id,),
+                (repository_id, len(prefix), prefix),
             ).fetchone()
             return row is not None
         finally:
@@ -227,7 +266,7 @@ class SQLiteGovernedL1Store:
                         incoming.value_hash,
                         exact["type"],
                         exact["valid_from"] or record.observed_at,
-                        None,
+                        record.head_sha,
                         _strength_from_confidence(float(exact["confidence"])).value,
                     ),
                 )
@@ -406,9 +445,9 @@ class SQLiteGovernedL1Store:
             """
             INSERT OR IGNORE INTO evidence(
                 id, memory_id, raw_source_id, source_agent, source_type,
-                source_pointer, source_hash, evidence_group, excerpt,
-                confidence, created_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                source_pointer, source_hash, evidence_group, excerpt, confidence,
+                observed_at, branch, head_sha, repository_id, created_at
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 _id("ev_"),
@@ -421,6 +460,10 @@ class SQLiteGovernedL1Store:
                 evidence.evidence_group,
                 record.content,
                 _confidence(evidence.strength),
+                evidence.observed_at,
+                evidence.branch,
+                evidence.head_sha,
+                evidence.repository_id,
                 _now(),
             ),
         )
