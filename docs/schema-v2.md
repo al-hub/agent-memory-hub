@@ -57,12 +57,17 @@ CREATE TABLE evidence (
   evidence_group TEXT NOT NULL,
   raw_pointer TEXT,
   observed_at TEXT,
+  repository_id TEXT,
+  branch TEXT,
+  head_sha TEXT,
   imported_at INTEGER NOT NULL,
   metadata_json TEXT NOT NULL
 );
 ```
 
 `evidence_group` prevents duplicated observations of the same original source from being counted as independent confirmation.
+
+For L1 ingestion, temporal and Git provenance belongs to each evidence record, not only to the consolidated memory claim. The production-compatible SQLite projection therefore persists `observed_at`, `repository_id`, `branch`, and `head_sha` on evidence rows. Existing stores are extended non-destructively with nullable columns; historical rows remain valid even when those fields are unknown.
 
 ### memory_evidence
 
@@ -171,6 +176,8 @@ Scope is intentionally extensible.
 
 Conflict detection should compare only memories with meaningfully overlapping scope.
 
+Repository-local production scope refs are repository-qualified. A branch, worktree, or task memory therefore belongs to the same repository family even when no repository-level row exists. FIRST/onboarding detection must recognize all of these forms rather than checking only `scope=repository`.
+
 ## Provenance rules
 
 1. Every promoted memory must link to at least one evidence row.
@@ -179,6 +186,7 @@ Conflict detection should compare only memories with meaningfully overlapping sc
 4. Multiple derived observations sharing one origin use one `evidence_group`.
 5. Confidence cannot increase merely because multiple agents repeated the same evidence.
 6. High-impact memories with only inferred evidence should remain `unverified` or `needs_review`.
+7. L1-derived evidence should preserve its own observation time and repository/branch/HEAD identity when available so later temporal validation does not depend on the consolidated memory row alone.
 
 ## Promotion policy
 
