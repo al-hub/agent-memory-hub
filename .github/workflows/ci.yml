@@ -25,6 +25,7 @@ jobs:
           python -m py_compile benchmarks/startup_breakdown.py
           python -m py_compile benchmarks/scope_first_ab.py
           python -m py_compile benchmarks/scope_first_three_way.py
+          python -m py_compile benchmarks/l1_ingestion_baseline.py
           python -m compileall -q src
       - name: Tests
         run: python -m unittest discover -s tests -v
@@ -106,3 +107,23 @@ jobs:
         with:
           name: scope-first-fts-three-way
           path: scope-first-three-way-results.json
+
+  benchmark-l1-ingestion:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: L1 ingestion baseline
+        run: |
+          python benchmarks/l1_ingestion_baseline.py \
+            --sizes 10,100,1000 \
+            --iterations 5 \
+            --output l1-ingestion-results.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: l1-ingestion-baseline
+          path: l1-ingestion-results.json
